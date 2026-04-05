@@ -213,7 +213,6 @@ class WirelessScreen(ctk.CTkFrame):
         self._built  = False
         self._server = None
         self._port   = 8765
-        self._polling = False   # Added to stop polling when server stops
 
     def on_focus(self):
         if not self._built:
@@ -366,7 +365,6 @@ class WirelessScreen(ctk.CTkFrame):
         self._status_dot.configure(text='● ONLINE', text_color=C['ok'])
         self._refresh_status()
         # Poll for incoming data
-        self._polling = True
         self._poll_data()
 
     def _stop_server(self):
@@ -378,7 +376,6 @@ class WirelessScreen(ctk.CTkFrame):
         self._start_btn.configure(state='normal', text='▶ START SERVER')
         self._stop_btn.configure(state='disabled')
         self._status_dot.configure(text='● OFFLINE', text_color=C['wn'])
-        self._polling = False
 
     def _refresh_status(self):
         ip   = get_local_ip()
@@ -416,7 +413,7 @@ class WirelessScreen(ctk.CTkFrame):
 
     def _poll_data(self):
         """Check for new sync data every 3 seconds"""
-        if not self._polling or _server_instance is None:
+        if _server_instance is None:
             return
         self._render_sync_data()
         self.after(3000, self._poll_data)
@@ -480,3 +477,19 @@ class WirelessScreen(ctk.CTkFrame):
                 ).pack(anchor='w')
 
         self._log_msg(f"Data refreshed — {len(calls)} calls, {len(sms)} SMS")
+        threading.Thread(target=_build, daemon=True).start()
+        Btn(popup, "CLOSE", command=popup.destroy,
+            variant='ghost', width=80).pack(pady=8)
+
+    def _do_usb_install(self, path):
+        out, err = subprocess.Popen(
+            f"adb install -r '{path}'",
+            shell=True, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True
+        ).communicate()
+        if 'Success' in out:
+            self.after(0, self._log_msg,
+                       "✓ Companion APK installed on phone!")
+        else:
+            self.after(0, self._log_msg,
+                       f"Install result: {out or err}")

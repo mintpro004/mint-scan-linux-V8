@@ -138,7 +138,7 @@ class MintScanApp:
         ctk.CTkLabel(logo_frame, text="[ MINT SCAN ]",
                      font=('Courier',14,'bold'),
                      text_color=C['ac']).pack(side='left')
-        ctk.CTkLabel(logo_frame, text=" v7",
+        ctk.CTkLabel(logo_frame, text=" v8",
                      font=('Courier',9),
                      text_color=C['mu']).pack(side='left', pady=(4,0))
 

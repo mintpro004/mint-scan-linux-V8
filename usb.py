@@ -5,9 +5,8 @@ Chrome file:// access denied issue completely bypassed.
 """
 import tkinter as tk
 import customtkinter as ctk
-import threading, subprocess, os, re, time, shutil, socket, json
+import threading, subprocess, os, re, time, shutil, socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from installer import install_adb
 from utils import run_cmd as _r
@@ -17,15 +16,6 @@ COMPANION_HTML = os.path.join(BASE, 'companion_app.html')
 
 # Port the mini HTTP server runs on locally — ADB forwards this to the phone
 COMPANION_PORT = 8765
-
-# Global sync data (shared with wireless module if needed)
-_sync_data = {
-    'device':   {},
-    'battery':  {},
-    'network':  {},
-    'location': {},
-    'last_sync': None,
-}
 
 
 class _CompanionHandler(BaseHTTPRequestHandler):
@@ -43,9 +33,11 @@ class _CompanionHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', len(html))
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_header('Pragma', 'no-cache')
+            # Android 16 Chrome CORS — allow everything on loopback
             self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
             self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            # Allow battery, location, notifications APIs in Chrome
             self.send_header('Permissions-Policy', 'geolocation=*, battery=*')
             self.end_headers()
             self.wfile.write(html)
@@ -56,32 +48,17 @@ class _CompanionHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Accept sync data posted back from the companion app."""
-        length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(length)
-        path = urlparse(self.path).path
-
         try:
-            payload = json.loads(body) if body else {}
-        except Exception:
-            self._send_json({'error': 'invalid JSON'}, 400)
-            return
-
-        # Store data in global sync dict
-        if path == '/sync/device':
-            _sync_data['device'] = payload
-        elif path == '/sync/battery':
-            _sync_data['battery'] = payload
-        elif path == '/sync/network':
-            _sync_data['network'] = payload
-        elif path == '/sync/location':
-            _sync_data['location'] = payload
-        else:
-            self.send_response(404)
+            length = int(self.headers.get('Content-Length', 0))
+            body   = self.rfile.read(length)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            return
-
-        _sync_data['last_sync'] = time.strftime('%Y-%m-%d %H:%M:%S')
-        self._send_json({'ok': True})
+            self.wfile.write(b'{"ok":true}')
+        except Exception:
+            self.send_response(500)
+            self.end_headers()
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -89,15 +66,6 @@ class _CompanionHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
-
-    def _send_json(self, data, status=200):
-        body = json.dumps(data).encode()
-        self.send_response(status)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', len(body))
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(body)
 
 
 class UsbScreen(ctk.CTkFrame):
@@ -308,6 +276,7 @@ class UsbScreen(ctk.CTkFrame):
             self.after(0, self._log, f"Shell binary:\n{out}")
         
         # Check hash of app_process (zygote)
+        # Try sha256sum, md5sum, or just ls -l
         out, _, rc = _r("adb shell sha256sum /system/bin/app_process32 2>/dev/null")
         if not out:
              out, _, rc = _r("adb shell md5sum /system/bin/app_process32 2>/dev/null")
@@ -331,9 +300,19 @@ class UsbScreen(ctk.CTkFrame):
         adb_ok = shutil.which('adb') is not None
         if adb_ok:
             ver, _, _ = _r("adb version 2>/dev/null | head -1")
-            # Simply update the existing ResultBox text
-            self.after(0, lambda: self.adb_status.configure(
-                text=f'✓ ADB Ready — {ver[:50]}', text_color=C['ok']))
+            def _do():
+                for w in self.adb_status.winfo_children(): w.destroy()
+                ResultBox(self.adb_status.__class__.__bases__[0].__new__(
+                    ctk.CTkFrame), 'ok',
+                    f'✓ ADB Ready — {ver}', '').pack()
+                # Recreate properly
+                self.adb_status.destroy()
+                self.adb_status = ResultBox(
+                    self.adb_status.master if hasattr(self.adb_status,'master')
+                    else self.scroll._body,
+                    'ok', f'✓ ADB Ready  —  {ver[:50]}', '')
+                self.install_adb_btn.pack_forget()
+            # Simpler approach
             self.after(0, lambda: self.install_adb_btn.pack_forget())
         else:
             self.after(0, lambda: self.install_adb_btn.pack(
@@ -455,6 +434,7 @@ class UsbScreen(ctk.CTkFrame):
         self.after(0, lambda: self.comp_prog.set(0.35))
 
         # Step 2: adb reverse — tunnels phone's localhost:PORT → desktop:PORT
+        # This is an ADB transport feature, works on all Android versions including 16
         fwd_out, fwd_err, fwd_rc = _r(
             f"adb -s {self._device} reverse tcp:{self._comp_port} tcp:{self._comp_port}",
             timeout=10)
@@ -476,21 +456,38 @@ class UsbScreen(ctk.CTkFrame):
         self.after(0, lambda: self.comp_prog.set(0.65))
 
         # Step 3: Open http://localhost:PORT on phone browser
+        # Android 16 am start syntax — must use -p for package (positional arg removed)
         url = f"http://localhost:{self._comp_port}"
 
+        # Try explicit component first (most reliable on Android 16),
+        # then -p package flag, then generic VIEW intent
         intents = [
+            # Chrome — explicit component (Android 16 preferred)
             f"adb -s {self._device} shell am start"
             f" -n com.android.chrome/com.google.android.apps.chrome.Main"
             f" -a android.intent.action.VIEW -d '{url}'",
+
+            # Samsung Internet — explicit component
             f"adb -s {self._device} shell am start"
             f" -n com.sec.android.app.sbrowser/.SBrowserMainActivity"
             f" -a android.intent.action.VIEW -d '{url}'",
+
+            # Chrome with -p package flag (Android 13+ syntax)
             f"adb -s {self._device} shell am start"
             f" -a android.intent.action.VIEW -d '{url}'"
             f" -p com.android.chrome",
+
+            # Firefox
             f"adb -s {self._device} shell am start"
             f" -a android.intent.action.VIEW -d '{url}'"
             f" -p org.mozilla.firefox",
+
+            # Brave
+            f"adb -s {self._device} shell am start"
+            f" -a android.intent.action.VIEW -d '{url}'"
+            f" -p com.brave.browser",
+
+            # Android 16 generic — system picks default browser
             f"adb -s {self._device} shell am start"
             f" -a android.intent.action.VIEW -d '{url}'"
             f" --activity-single-top",
@@ -504,6 +501,11 @@ class UsbScreen(ctk.CTkFrame):
                 opened = True
                 self._log(f"✓ Browser intent sent successfully")
                 break
+            else:
+                # Log which one failed for debugging
+                pkg = re.search(r'(?:-n |\.)(com\.\S+)', cmd)
+                if pkg:
+                    self._log(f"  ↳ {pkg.group(1)}: not found, trying next...")
 
         self.after(0, lambda: self.comp_prog.set(1.0))
         self.after(0, lambda: self.comp_btn.configure(
@@ -513,10 +515,12 @@ class UsbScreen(ctk.CTkFrame):
             self._log(f"✓ Companion opened on phone!")
             self._log(f"  Server stays running. Tap ⏹ STOP SERVER when done.")
         else:
+            # All intents failed — give manual URL prominently
             self._log(f"")
             self._log(f"✓ SERVER IS RUNNING — open this on your phone:")
             self._log(f"  ► http://localhost:{self._comp_port}")
             self._log(f"  Type this in your phone's browser address bar.")
+            self._log(f"  (Works because ADB tunnel is active over USB)")
 
     def _open_companion(self):
         """Re-open companion — server must already be running."""
@@ -528,6 +532,7 @@ class UsbScreen(ctk.CTkFrame):
             return
         url = f"http://localhost:{self._comp_port}"
         def _do():
+            # Android 16: try component first, then generic
             cmds = [
                 f"adb -s {self._device} shell am start"
                 f" -n com.android.chrome/com.google.android.apps.chrome.Main"
