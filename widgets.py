@@ -86,9 +86,6 @@ def load_theme_settings():
 
 
 # ── ScrollableFrame ───────────────────────────────────────────────
-# Uses CTkScrollableFrame — no proxy tricks, no __str__ override.
-# Mouse wheel is bound globally on <Enter> so touchpad works too.
-
 class ScrollableFrame(ctk.CTkScrollableFrame):
     """
     Scrollable container that works on Chromebook, Ubuntu, Kali, WSL.
@@ -130,26 +127,25 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
         # Windows/macOS: event.delta; Linux: Button-4/5
         try:
             if event.delta:
-                self._parent_canvas.yview_scroll(
+                self._canvas.yview_scroll(
                     int(-1 * (event.delta / 120)), 'units')
         except Exception:
             pass
 
     def _scroll_up(self, event):
         try:
-            self._parent_canvas.yview_scroll(-2, 'units')
+            self._canvas.yview_scroll(-2, 'units')
         except Exception:
             pass
 
     def _scroll_down(self, event):
         try:
-            self._parent_canvas.yview_scroll(2, 'units')
+            self._canvas.yview_scroll(2, 'units')
         except Exception:
             pass
 
 
 # ── Card ──────────────────────────────────────────────────────────
-
 class Card(ctk.CTkFrame):
     def __init__(self, parent, accent=None, **kwargs):
         fg = kwargs.pop('fg_color', C['sf'])
@@ -167,7 +163,6 @@ class Card(ctk.CTkFrame):
 
 
 # ── SectionHeader ─────────────────────────────────────────────────
-
 class SectionHeader(ctk.CTkFrame):
     def __init__(self, parent, num, title, **kwargs):
         fg = kwargs.pop('fg_color', 'transparent')
@@ -186,7 +181,6 @@ class SectionHeader(ctk.CTkFrame):
 
 
 # ── InfoGrid ──────────────────────────────────────────────────────
-
 class InfoGrid(ctk.CTkFrame):
     def __init__(self, parent, items, columns=2, **kwargs):
         fg = kwargs.pop('fg_color', 'transparent')
@@ -218,7 +212,6 @@ class InfoGrid(ctk.CTkFrame):
 
 
 # ── ResultBox ─────────────────────────────────────────────────────
-
 class ResultBox(ctk.CTkFrame):
     def __init__(self, parent, rtype='ok', title='', body='', **kwargs):
         col = {
@@ -253,7 +246,6 @@ class ResultBox(ctk.CTkFrame):
 
 
 # ── Btn ───────────────────────────────────────────────────────────
-
 class Btn(ctk.CTkButton):
     def __init__(self, parent, label, command=None,
                  variant='primary', width=140, **kwargs):
@@ -310,7 +302,6 @@ class Btn(ctk.CTkButton):
 
 
 # ── Badge ─────────────────────────────────────────────────────────
-
 class Badge(ctk.CTkFrame):
     def __init__(self, parent, label, color, **kwargs):
         fg = kwargs.pop('fg_color', C['s2'])
@@ -333,7 +324,6 @@ class Badge(ctk.CTkFrame):
 
 
 # ── LiveBadge ─────────────────────────────────────────────────────
-
 class LiveBadge(ctk.CTkFrame):
     def __init__(self, parent, **kwargs):
         fg = kwargs.pop('fg_color', 'transparent')
@@ -359,7 +349,6 @@ class LiveBadge(ctk.CTkFrame):
 
 
 # ── PortBar ───────────────────────────────────────────────────────
-
 class PortBar(ctk.CTkFrame):
     def __init__(self, parent, port, proto, state, process, **kwargs):
         RISK = {'23': 'Telnet', '4444': 'Metasploit', '1337': 'Suspicious'}

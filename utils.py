@@ -7,6 +7,7 @@ import json
 import threading
 import time
 import shutil
+import requests   # <-- moved to top
 
 # Import colours and fonts from widgets (single source of truth)
 from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
@@ -45,7 +46,6 @@ def run_cmd(cmd, timeout=8):
 
 def get_public_ip_info():
     """Fetch real public IP, ISP, city, country from ipapi.co."""
-    import requests
     try:
         r = requests.get('https://ipapi.co/json/', timeout=6)
         return r.json()
