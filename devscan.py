@@ -726,7 +726,7 @@ class DevScanScreen(ctk.CTkFrame):
                 json.dump({'devices': safe, 'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')}, f, indent=2)
         else:
             lines = [
-                "MINT SCAN v7 — DEVICE SCAN REPORT",
+                "MINT SCAN v8 — DEVICE SCAN REPORT",
                 f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
                 f"Devices found: {len(self._devices)}",
                 "=" * 60, ""

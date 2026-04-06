@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔══════════════════════════════════════════════════════════════╗
-# ║   MINT SCAN v8 — SELF-HEALING INSTALLER                     ║
+# ║   MINT SCAN v8 — SELF-HEALING INSTALLER  (git clone only)   ║
 # ║   Fixes: Chromebook UFW · Sudo hang · All platforms         ║
 # ║   Platforms: Ubuntu · Kali · Chromebook · WSL2              ║
 # ╚══════════════════════════════════════════════════════════════╝
@@ -11,7 +11,7 @@ cd "$SCRIPT_DIR"
 
 echo -e "${CYAN}${BOLD}"
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║   MINT SCAN v8 — SELF-HEALING INSTALLER                     ║"
+echo "║   MINT SCAN v8 — SELF-HEALING INSTALLER  (git clone only)   ║"
 echo "║   Pretoria · Mint Projects PTY (Ltd) · South Africa         ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
@@ -49,6 +49,19 @@ fi
 if [ "$IS_CHROMEBOOK" = false ] && [ "$IS_WSL" = false ] && [ "$IS_KALI" = false ]; then
     echo -e "  ${GREEN}✓ Standard Linux detected (Ubuntu/Debian)${NC}"
 fi
+
+# ── GIT REPOSITORY CHECK ──────────────────────────────────────────
+echo -e "${YELLOW}Checking git repository...${NC}"
+if [ ! -d "$SCRIPT_DIR/.git" ]; then
+    echo -e "${YELLOW}  ⚠ Not a git repository.${NC}"
+    echo -e "${YELLOW}  For updates, clone via git:${NC}"
+    echo -e "${CYAN}    git clone https://github.com/mintpro004/mint-scan-linux-V8.git ~/mint-scan-linux${NC}"
+    echo -e "${YELLOW}  Continuing install from current directory...${NC}"
+else
+    echo -e "${GREEN}  ✓ Git repository detected${NC}"
+    echo -e "  Remote: $(git remote get-url origin 2>/dev/null || echo 'not configured')"
+fi
+
 
 # ── [1/7] Fix ownership ───────────────────────────────────────
 echo -e "${YELLOW}[1/7] Fixing ownership...${NC}"
@@ -99,7 +112,9 @@ echo -e "${GREEN}  ✓ Done${NC}"
 echo -e "${YELLOW}[3/7] Setting up Python environment...${NC}"
 [ ! -d "venv" ] && python3 -m venv venv
 source venv/bin/activate
-pip install -q --upgrade pip 2>/dev/null
+pip install -r requirements.txt
+# Optional extras (tray, desktop notifications, PDF export)
+pip install pystray pillow plyer reportlab 2>/dev/null || true
 pip install -q -r requirements.txt 2>/dev/null || \
     pip install -q customtkinter requests psutil netifaces pillow darkdetect 2>/dev/null
 echo -e "${GREEN}  ✓ Done${NC}"

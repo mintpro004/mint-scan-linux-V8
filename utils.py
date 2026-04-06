@@ -7,6 +7,8 @@ import json
 import threading
 import time
 import shutil
+from logger import get_logger as _get_logger
+_log = _get_logger("utils")
 
 # Import colours and fonts from widgets (single source of truth)
 from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
@@ -15,31 +17,51 @@ from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 _pkexec_warned = False
 
 def run_cmd(cmd, timeout=8):
-    """Run a shell command safely, using pkexec for sudo if needed."""
+    """
+    Run a shell command safely.
+    - Uses pkexec for sudo commands in GUI mode (no password prompt hang)
+    - Sets DEBIAN_FRONTEND=noninteractive so apt never waits for input
+    - Logs errors properly instead of printing to stderr
+    - Handles Timeout, FileNotFound, Permission errors distinctly
+    """
     global _pkexec_warned
-    # Handle sudo via pkexec for GUI apps if pkexec exists
+    original_cmd = cmd
+
     if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
         has_pkexec = shutil.which('pkexec')
         if has_pkexec:
-            inner = cmd.strip()[5:]
-            inner_quoted = inner.replace("'", "'\\''")
-            cmd = f"pkexec bash -c '{inner_quoted}'"
+            inner        = cmd.strip()[5:].strip()
+            inner_quoted = inner.replace("'", "'\''")
+            cmd          = f"pkexec bash -c '{inner_quoted}'"
         else:
-            # Fallback to direct sudo (might fail if non-interactive)
             if not _pkexec_warned:
-                # We could log this to a file instead of stderr to avoid user worry
-                # but for now, we just stay silent and let sudo handle it.
+                _log.warning('pkexec not found — sudo may fail in GUI mode')
                 _pkexec_warned = True
-            pass
+
+    run_env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
 
     try:
         r = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=timeout
-        )
+            cmd, shell=True, capture_output=True,
+            text=True, timeout=timeout, env=run_env)
+        if r.returncode != 0 and r.stderr.strip():
+            _log.debug(f'cmd [{r.returncode}]: {r.stderr.strip()[:120]}')
         return r.stdout.strip(), r.stderr.strip(), r.returncode
+
     except subprocess.TimeoutExpired:
-        return '', 'timeout', 1
+        _log.warning(f'Timeout ({timeout}s): {original_cmd[:80]}')
+        return '', f'timeout after {timeout}s', 1
+
+    except FileNotFoundError as e:
+        _log.error(f'Not found: {e}')
+        return '', str(e), 127
+
+    except PermissionError as e:
+        _log.error(f'Permission denied: {e}')
+        return '', str(e), 126
+
     except Exception as e:
+        _log.error(f'run_cmd error: {e}')
         return '', str(e), 1
 
 

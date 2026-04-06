@@ -1,5 +1,5 @@
 """
-Mint Scan v7 — Shared Widgets
+Mint Scan v8 — Shared Widgets
 Uses CTkScrollableFrame (simple + reliable) with proper mouse wheel binding.
 Dark / light theme support included.
 """

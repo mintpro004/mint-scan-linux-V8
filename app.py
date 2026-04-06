@@ -8,12 +8,17 @@ import threading, time, sys, os, json
 
 # Import colour palette from widgets (single source of truth)
 from widgets import C, apply_theme, ScrollableFrame
+from logger import get_logger as _gl
+_log = _gl('app')
 
 BOOT_LINES = [
     "INITIALISING MINT SCAN v8...",
-    "LOADING SECURITY MODULES...",
+    "LOADING 22 SECURITY MODULES...",
+    "STARTING LOGGER & NOTIFIER...",
     "PROBING NETWORK INTERFACES...",
-    "LOADING THREAT ENGINE...",
+    "LOADING THREAT ENGINE + IDS...",
+    "STARTING THREAT MONITOR...",
+    "LOADING PLUGIN SYSTEM...",
     "READING SYSTEM STATE...",
     "✓ ALL SYSTEMS READY.",
 ]
@@ -41,6 +46,14 @@ ALL_TABS = [
     ('toolbox',     'Toolbox',      '🛠'),
     ('investigate', 'Investigate',  '🕵'),
     ('auditor',     'Auditor',      '⚖'),
+    ('cvelookup',   'CVE Lookup',   '🔍'),
+    ('secureerase', 'Secure Erase', '🗑'),
+    ('vpn',         'VPN',          '🔒'),
+    ('ids',         'IDS/IPS',      '🚨'),
+    ('webmonitor',  'Web Monitor',  '🌐'),
+    ('daemon',      'Daemon',       '⚙'),
+    ('updater',     'Updater',      '🔄'),
+    ('plugins',     'Plugins',      '🔌'),
     ('settings',    'Settings',     '⚙'),
 ]
 
@@ -121,6 +134,42 @@ class MintScanApp:
     def _launch_main(self):
         self.boot.destroy()
         self._build_ui()
+        self._start_services()
+
+    def _start_services(self):
+        """Start background services after UI is ready."""
+        # Logging
+        _log.info('Mint Scan v8 started')
+        # Real-time threat monitor
+        try:
+            from notifier import start_threat_monitor, register_toast
+            register_toast(self._show_toast)
+            start_threat_monitor(interval=120)
+            _log.info('Threat monitor started')
+        except Exception as e:
+            _log.warning(f'Notifier start failed: {e}')
+        # System tray
+        try:
+            from tray import start_tray
+            start_tray(self, score_fn=lambda: getattr(self, '_last_score', '—'))
+            _log.info('System tray started')
+        except Exception as e:
+            _log.warning(f'Tray start failed: {e}')
+        # Load plugins
+        try:
+            from plugins import load_all, broadcast_event
+            results = load_all()
+            broadcast_event('app_start', {'version': '8.0'})
+            _log.info(f'Plugins: {len(results)} loaded')
+        except Exception as e:
+            _log.warning(f'Plugin load failed: {e}')
+
+    def _show_toast(self, title, msg, level):
+        """Show in-app toast notification."""
+        import tkinter.messagebox as mb
+        if level == 'CRITICAL':
+            self.root.after(0, lambda: mb.showwarning(
+                f'⚠ {title}', msg, parent=self.root))
 
     # ── MAIN UI ───────────────────────────────────────────────
 
@@ -213,6 +262,14 @@ class MintScanApp:
             'auditor':     _safe('auditor',     'AuditorScreen'),
             'guardian':    _safe('guardian',    'GuardianScreen'),
             'settings':    _safe('settings',    'SettingsScreen'),
+            'cvelookup':   _safe('cvelookup',   'CVELookupScreen'),
+            'secureerase': _safe('secureerase', 'SecureEraseScreen'),
+            'vpn':         _safe('vpn',         'VPNScreen'),
+            'ids':         _safe('ids',         'IDSScreen'),
+            'webmonitor':  _safe('webmonitor',  'WebMonitorScreen'),
+            'daemon':      _safe('daemon',      'DaemonScreen'),
+            'updater':     _safe('updater',     'UpdaterScreen'),
+            'plugins':     _safe('plugins',     'PluginScreen'),
         }
         # Only keep successfully loaded screens
         screen_map = {k: v for k, v in screen_map.items() if v is not None}
@@ -439,8 +496,15 @@ class MintScanApp:
     # ── PUBLIC API ────────────────────────────────────────────
 
     def update_score(self, score):
+        self._last_score = score
         col = C['ok'] if score >= 75 else C['am'] if score >= 50 else C['wn']
         self.score_lbl.configure(text=f"SCORE {score}", text_color=col)
+        try:
+            from tray import update_tray_tooltip
+            status = 'SECURE' if score >= 75 else 'AT RISK' if score >= 50 else 'CRITICAL'
+            update_tray_tooltip(f'Mint Scan v8 — Score: {score} ({status})')
+        except Exception:
+            pass
 
     def run(self):
         self.root.mainloop()

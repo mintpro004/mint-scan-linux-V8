@@ -169,7 +169,7 @@ class SyncHandler(BaseHTTPRequestHandler):
 </head>
 <body>
 <h1>[ MINT SCAN ]</h1>
-<div class="sub">Wireless Sync Server v7.0 — Mint Projects</div>
+<div class="sub">Wireless Sync Server v8.0 — Mint Projects</div>
 
 <div class="card">
   <div class="label">Server Status</div>
