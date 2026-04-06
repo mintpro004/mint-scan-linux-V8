@@ -376,7 +376,13 @@ class DashScreen(ctk.CTkFrame):
         ipinfo   = get_public_ip_info()
         ports    = get_open_ports()
         procs    = get_processes(10)
-        self.after(0, self._render, sysinfo, bat, local_ip, ipinfo, ports, procs)
+        def _safe_render():
+            try:
+                if self.winfo_exists():
+                    self._render(sysinfo, bat, local_ip, ipinfo, ports, procs)
+            except Exception as e:
+                pass
+        self.after(0, _safe_render)
 
     def _render(self, sysinfo, bat, local_ip, ipinfo, ports, procs):
         # ── Score calculation ──────────────────────────────────
@@ -513,8 +519,14 @@ class DashScreen(ctk.CTkFrame):
             try: mem = int(mem_out.strip() or 0)
             except: mem = 0
             def _ui():
-                self._card_cpu._chart and self._card_cpu._chart.push(cpu)
-                self._card_mem._chart and self._card_mem._chart.push(mem)
+                try:
+                    if not self.winfo_exists():
+                        return
+                    self._card_cpu._chart and self._card_cpu._chart.push(cpu)
+                    self._card_mem._chart and self._card_mem._chart.push(mem)
+                except Exception:
+                    pass
             self.after(0, _ui)
         threading.Thread(target=_bg, daemon=True).start()
-        self.after(4000, self._live_loop)
+        if self._running:
+            self.after(4000, self._live_loop)

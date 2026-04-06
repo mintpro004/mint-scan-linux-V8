@@ -21,6 +21,20 @@ RISKY_PORTS = ['21', '23', '3389', '5900', '161']
 
 
 class PortsScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -32,6 +46,11 @@ class PortsScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         threading.Thread(target=self._load_local, daemon=True).start()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -90,7 +109,7 @@ class PortsScreen(ctk.CTkFrame):
     def _load_local(self):
         ports = get_open_ports()
         conns = get_active_connections()
-        self.after(0, self._render_local, ports, conns)
+        self._safe_after(0, self._render_local, ports, conns)
 
     def _render_local(self, ports, conns):
         if not hasattr(self, "local_frame"): return
@@ -152,7 +171,7 @@ class PortsScreen(ctk.CTkFrame):
                 m = re.match(r'(\d+)/tcp\s+open\s+(\S+)', line)
                 if m:
                     open_ports.append({'port': m.group(1), 'service': m.group(2)})
-            self.after(0, self._render_remote, host, open_ports, 'nmap')
+            self._safe_after(0, self._render_remote, host, open_ports, 'nmap')
             self._cleanup_scan()
             return
 
@@ -160,7 +179,7 @@ class PortsScreen(ctk.CTkFrame):
         for i, port in enumerate(range(start, end+1)):
             if not self._scanning: break
             prog = i / total
-            self.after(0, lambda p=prog, port=port: (
+            self._safe_after(0, lambda p=prog, port=port: (
                 self.scan_prog.set(p),
                 self.scan_prog_lbl.configure(
                     text=f"Scanning port {port}... ({i}/{total})")
@@ -175,12 +194,12 @@ class PortsScreen(ctk.CTkFrame):
             except Exception:
                 pass
 
-        self.after(0, self._render_remote, host, open_ports, 'socket')
+        self._safe_after(0, self._render_remote, host, open_ports, 'socket')
         self._cleanup_scan()
 
     def _cleanup_scan(self):
         self._scanning = False
-        self.after(0, lambda: (
+        self._safe_after(0, lambda: (
             self.scan_btn.configure(state='normal', text='SCAN'),
             self.scan_prog.set(1),
             self.scan_prog_lbl.configure(text='✓ Scan complete')

@@ -1,42 +1,74 @@
 # Mint Scan v8 — Advanced Linux Security Auditor
-**By Mint Projects PTY (Ltd) · Pretoria, South Africa**
+**Mint Projects PTY (Ltd) · Pretoria, South Africa · 2026**
 
-## What's New in v8
-
-### 🔧 Bug Fixes
-- **Chromebook UFW fix** — Installer detects Crostini at runtime via `crosh`, kernel string, and `/proc/version`. Skips `iptables-persistent` and runs a stripped-down UFW install that succeeds on Chromebook.
-- **Sudo hang eliminated** — `DEBIAN_FRONTEND=noninteractive` is now injected directly into the subprocess environment dict, not just as a shell prefix. Fully unattended install on all platforms.
-
-### ✨ New Features
-- **Traffic Log clipboard operations** — Copy All, Copy Selection, Paste (Ctrl+V / PASTE button), Select All, Clear, Find/Search (↓↑ nav, all-match highlight), Save as TXT, Save as CSV. Log stays always editable.
-- **4-platform mobile apps** — `mint_scan_android.html` (42KB, self-contained): 8 tabs, 0–100 security score, WebRTC leak detection, port scanner, DNS/GeoIP/SSL, bi-directional sync, offline service worker.
-  - `bash build_mobile.sh all` → Android APK + iOS PWA + Windows Electron + macOS Electron
-
-## Quick Install
+## Installation (git clone only)
 
 ```bash
-# Chromebook / Ubuntu / Kali / WSL2
-git clone https://github.com/mintpro004/mint-scan-linux.git ~/mint-scan-linux
+git clone https://github.com/mintpro004/mint-scan-linux-V8.git ~/mint-scan-linux
 cd ~/mint-scan-linux
 bash install.sh
-bash run.sh
+bash run.sh          # Never: sudo bash run.sh
 ```
 
-## Supported Platforms
-| Platform | Status |
-|---|---|
-| Chromebook (Crostini) | ✅ Fixed in v8 |
-| Ubuntu 20.04+ | ✅ |
-| Debian 11/12 | ✅ |
-| Kali Linux | ✅ |
-| Windows WSL2 | ✅ |
+## Update
 
-## 22 Screens
-Dashboard · Permissions · Wi-Fi · Calls · Network · Battery · Threats · Guardian · Notifs · Port Scan · USB Sync · Wireless · Device Scan · Recovery · Net Scan · Malware · Sys Fix · Firewall · Toolbox · Investigate · Auditor · Settings
+```bash
+cd ~/mint-scan-linux
+bash update.sh       # git pull + re-install deps
+```
 
-## Support
-- Email: support@mintprojects.co.za
-- Website: https://mintprojects.co.za
-- GitHub: https://github.com/mintpro004/mint-scan-linux
+## 31 Security Screens + 13 New Features
 
-🇿🇦 Proudly South African
+| Tab | Screen |
+|-----|--------|
+| Dashboard | Live score ring, CPU/RAM charts, threat status |
+| Permissions | SUID/SGID audit, world-writable paths |
+| Wi-Fi | Network scan, rogue AP detection |
+| Calls | Active connections, socket audit |
+| Network | **Analog speedometer gauges**, ping graph, clipboard traffic log |
+| Battery | Health, cycles, charge history |
+| Threats | 19 malware indicators, one-click fix |
+| Guardian | **Real monitoring** — SSH brute-force, dangerous ports, auto-notify |
+| Notifs | Security event history |
+| Port Scan | Threaded scanner, service detection |
+| USB Sync | Android data recovery, SQLite extraction |
+| Wireless | Wi-Fi server, phone sync |
+| Device Scan | IoT/CCTV fingerprinting, 30+ vendor MACs |
+| Recovery | Deleted file recovery, WhatsApp DB |
+| Net Scan | Subnet scanner, ARP table |
+| Malware | ClamAV + rkhunter |
+| Sys Fix | System repair, package resolver |
+| Firewall | **Chromebook-fixed** UFW GUI |
+| Toolbox | Security utilities |
+| Investigate | IP intel, WHOIS, GeoIP |
+| Auditor | POPIA compliance reports |
+| CVE Lookup | **NIST NVD live lookup** |
+| Secure Erase | **DoD 3-pass shred** |
+| VPN | **WireGuard + OpenVPN** (auto-detect configs) |
+| IDS/IPS | **Suricata + Snort** (auto-detect interface) |
+| Web Monitor | **Remote browser dashboard** (port 7777) |
+| Daemon | **systemd service** install/manage |
+| Updater | **GitHub releases** auto-update |
+| Plugins | Plugin manager |
+| Marketplace | **Plugin marketplace** (GitHub catalogue) |
+| Terminal | **Built-in PTY terminal** + history |
+| Settings | Dark/light theme, instant apply |
+
+## Mobile Apps
+
+```bash
+bash build_mobile.sh all          # Android · iOS · Windows · macOS
+bash build_mobile.sh android      # Android only
+```
+
+## Requirements
+
+- Python 3.8+
+- Chromebook (Crostini), Ubuntu 20.04+, Debian 11+, Kali Linux, WSL2
+
+## No direct downloads — git clone only
+
+All updates via `bash update.sh` (git pull). No zip files distributed.
+
+---
+© 2026 Mint Projects PTY (Ltd) · github.com/mintpro004/mint-scan-linux-V8

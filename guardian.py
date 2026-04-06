@@ -15,6 +15,20 @@ log = get_logger('guardian')
 
 
 class GuardianScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app              = app
@@ -28,6 +42,11 @@ class GuardianScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         self._refresh_status()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -138,7 +157,7 @@ class GuardianScreen(ctk.CTkFrame):
             self._glog.insert('end', f'[{ts}] {msg}\n')
             self._glog.see('end')
             self._glog.configure(state='disabled')
-        self.after(0, _do)
+        self._safe_after(0, _do)
 
     def _refresh_status(self):
         pass

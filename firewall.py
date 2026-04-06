@@ -8,6 +8,20 @@ from utils import run_cmd as _run
 
 
 class FirewallScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -18,6 +32,11 @@ class FirewallScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         threading.Thread(target=self._load_status, daemon=True).start()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         # Header
@@ -195,8 +214,8 @@ class FirewallScreen(ctk.CTkFrame):
     def _load_status(self):
         ufw_out, _, rc = _run('ufw status verbose 2>/dev/null')
         active = rc == 0 and 'active' in ufw_out.lower()
-        self.after(0, self._render_status, ufw_out, active)
-        self.after(0, self._render_rules, ufw_out)
+        self._safe_after(0, self._render_status, ufw_out, active)
+        self._safe_after(0, self._render_rules, ufw_out)
 
     def _render_status(self, ufw_out, active):
         for w in self.status_card.winfo_children():
@@ -338,7 +357,7 @@ class FirewallScreen(ctk.CTkFrame):
         self._alog("Enabling firewall...")
         def _do():
             out, err, rc = _run("sudo ufw --force enable")
-            self.after(0, self._alog,
+            self._safe_after(0, self._alog,
                        "✓ Firewall enabled" if rc==0 else f"✗ {(err or out)[:80]}")
             self.after(500, lambda: threading.Thread(
                 target=self._load_status, daemon=True).start())
@@ -348,7 +367,7 @@ class FirewallScreen(ctk.CTkFrame):
         self._alog("WARNING: Disabling firewall — all ports will be unprotected!")
         def _do():
             out, err, rc = _run("sudo ufw disable")
-            self.after(0, self._alog,
+            self._safe_after(0, self._alog,
                        "Firewall disabled" if rc==0 else f"✗ {(err or out)[:80]}")
             self.after(500, lambda: threading.Thread(
                 target=self._load_status, daemon=True).start())
@@ -364,18 +383,18 @@ class FirewallScreen(ctk.CTkFrame):
                 ("sudo ufw allow ssh",                   "Allowed SSH (22)"),
             ]:
                 out, err, rc = _run(cmd)
-                self.after(0, self._alog,
+                self._safe_after(0, self._alog,
                            f"  {'✓' if rc==0 else '✗'} {msg}: {(out or err or 'done')[:60]}")
             self.after(500, lambda: threading.Thread(
                 target=self._load_status, daemon=True).start())
-            self.after(0, self._alog, "✓ Secure defaults applied")
+            self._safe_after(0, self._alog, "✓ Secure defaults applied")
         threading.Thread(target=_do, daemon=True).start()
 
     def _allow_port(self, port, name=''):
         self._alog(f"Allowing port {port} ({name})...")
         def _do(pt=port, nm=name):
             out, err, rc = _run(f"sudo ufw allow {pt}")
-            self.after(0, self._alog,
+            self._safe_after(0, self._alog,
                        f"{'✓ Allowed port '+pt+' ('+nm+')' if rc==0 else '✗ '+( err or out)[:60]}")
             self.after(500, lambda: threading.Thread(
                 target=self._load_status, daemon=True).start())
@@ -409,7 +428,7 @@ class FirewallScreen(ctk.CTkFrame):
         self._alog(f"Running: {cmd}")
         def _do(c=cmd):
             out, err, rc = _run(c)
-            self.after(0, self._alog,
+            self._safe_after(0, self._alog,
                        f"{'✓ Rule applied: '+c if rc==0 else '✗ '+( err or out)[:100]}")
             self.after(500, lambda: threading.Thread(
                 target=self._load_status, daemon=True).start())
@@ -424,7 +443,7 @@ class FirewallScreen(ctk.CTkFrame):
         def _do(pt=port):
             out, err, rc = _run(f"echo 'y' | sudo ufw delete allow {pt} 2>/dev/null || "
                                  f"echo 'y' | sudo ufw delete deny {pt} 2>/dev/null")
-            self.after(0, self._alog,
+            self._safe_after(0, self._alog,
                        f"{'✓ Rule deleted for port '+pt if rc==0 else '✗ '+( err or out)[:80]}")
             self.after(500, lambda: threading.Thread(
                 target=self._load_status, daemon=True).start())
@@ -434,7 +453,7 @@ class FirewallScreen(ctk.CTkFrame):
         self._alog(f"Deleting rule #{num}...")
         def _do(n=num):
             out, err, rc = _run(f"echo 'y' | sudo ufw delete {n} 2>/dev/null")
-            self.after(0, self._alog,
+            self._safe_after(0, self._alog,
                        f"{'✓ Deleted rule #'+n if rc==0 else '✗ '+( err or out)[:80]}")
             self.after(800, lambda: threading.Thread(
                 target=self._load_status, daemon=True).start())

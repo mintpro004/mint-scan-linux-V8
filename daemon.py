@@ -112,6 +112,20 @@ from widgets import (C, MONO, MONO_SM, ScrollableFrame, Card,
 
 
 class DaemonScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app    = app
@@ -122,6 +136,11 @@ class DaemonScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         self._refresh_status()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -193,7 +212,7 @@ class DaemonScreen(ctk.CTkFrame):
         self._msg_lbl.configure(text='Installing service...', text_color=C['ac'])
         def _bg():
             ok, msg = install_service()
-            self.after(0, self._msg_lbl.configure,
+            self._safe_after(0, self._msg_lbl.configure,
                        {'text': ('✓ ' if ok else '✗ ') + msg,
                         'text_color': C['ok'] if ok else C['wn']})
             self.after(500, self._refresh_status)
@@ -203,7 +222,7 @@ class DaemonScreen(ctk.CTkFrame):
         self._msg_lbl.configure(text='Removing service...', text_color=C['am'])
         def _bg():
             ok, msg = uninstall_service()
-            self.after(0, self._msg_lbl.configure,
+            self._safe_after(0, self._msg_lbl.configure,
                        {'text': ('✓ ' if ok else '✗ ') + msg,
                         'text_color': C['ok'] if ok else C['wn']})
             self.after(500, self._refresh_status)

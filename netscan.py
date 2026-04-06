@@ -9,6 +9,20 @@ from reports import prompt_save_report
 
 
 class NetScanScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -20,6 +34,11 @@ class NetScanScreen(ctk.CTkFrame):
         if not self._built:
             self._build()
             self._built = True
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -205,7 +224,7 @@ class NetScanScreen(ctk.CTkFrame):
                                     'host': parts[1] if len(parts)>3 else '',
                                     'vendor': '—'})
 
-        self.after(0, self._render_devices, devices, subnet)
+        self._safe_after(0, self._render_devices, devices, subnet)
 
     def _render_devices(self, devices, subnet):
         for w in self.devices_frame.winfo_children(): w.destroy()
@@ -247,9 +266,9 @@ class NetScanScreen(ctk.CTkFrame):
         threading.Thread(target=self._do_device_scan, args=(ip,), daemon=True).start()
 
     def _do_device_scan(self, ip):
-        self.after(0, lambda: self._log_traffic(f"Scanning {ip}..."))
+        self._safe_after(0, lambda: self._log_traffic(f"Scanning {ip}..."))
         out, _, _ = run(f"nmap -T4 --open -p 1-1000 {ip} 2>/dev/null", timeout=30)
-        self.after(0, lambda: self._log_traffic(f"Results for {ip}:\n{out[:600]}"))
+        self._safe_after(0, lambda: self._log_traffic(f"Results for {ip}:\n{out[:600]}"))
 
     def _toggle_capture(self):
         if self._capturing:
@@ -285,13 +304,13 @@ class NetScanScreen(ctk.CTkFrame):
             for line in self._cap_proc.stdout:
                 if not self._capturing: break
                 if count < 200:
-                    self.after(0, self._log_traffic, line.strip())
+                    self._safe_after(0, self._log_traffic, line.strip())
                     count += 1
         except Exception as e:
-            self.after(0, self._log_traffic, f"Capture error: {e}")
+            self._safe_after(0, self._log_traffic, f"Capture error: {e}")
         finally:
             self._capturing = False
-            self.after(0, lambda: self.cap_status.configure(
+            self._safe_after(0, lambda: self.cap_status.configure(
                 text="● CAPTURE STOPPED", text_color=C['mu']))
 
     def _log_traffic(self, msg):
@@ -532,7 +551,7 @@ class NetScanScreen(ctk.CTkFrame):
             vulns.append(('OK', '✓ No critical vulnerabilities found',
                           'Basic security checks passed'))
 
-        self.after(0, self._render_vulns, vulns, fixes)
+        self._safe_after(0, self._render_vulns, vulns, fixes)
 
     def _render_vulns(self, vulns, fixes):
         for w in self.vuln_frame.winfo_children(): w.destroy()

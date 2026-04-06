@@ -207,6 +207,20 @@ class SyncHandler(BaseHTTPRequestHandler):
 # WIRELESS SYNC SCREEN
 # ══════════════════════════════════════════════════════════════════
 class WirelessScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -219,6 +233,11 @@ class WirelessScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         self._refresh_status()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         # ── Header ──────────────────────────────────────────────
@@ -488,8 +507,8 @@ class WirelessScreen(ctk.CTkFrame):
             stderr=subprocess.PIPE, text=True
         ).communicate()
         if 'Success' in out:
-            self.after(0, self._log_msg,
+            self._safe_after(0, self._log_msg,
                        "✓ Companion APK installed on phone!")
         else:
-            self.after(0, self._log_msg,
+            self._safe_after(0, self._log_msg,
                        f"Install result: {out or err}")

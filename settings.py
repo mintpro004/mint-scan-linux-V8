@@ -36,6 +36,20 @@ def save_settings(s):
 
 
 class SettingsScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -47,6 +61,11 @@ class SettingsScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         self._load_values()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         # Header
@@ -274,7 +293,7 @@ class SettingsScreen(ctk.CTkFrame):
             from utils import run_cmd
             out, err, rc = run_cmd(cmd)
             msg = "✓ Tweak applied" if rc == 0 else f"✗ Failed: {err or out}"
-            self.after(0, lambda m=msg: self.status_lbl.configure(
+            self._safe_after(0, lambda m=msg: self.status_lbl.configure(
                 text=m, text_color=C['ok'] if rc==0 else C['wn']))
         threading.Thread(target=_do, daemon=True).start()
 

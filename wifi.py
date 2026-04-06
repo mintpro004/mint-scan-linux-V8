@@ -22,6 +22,20 @@ def sec_color(sec):
 
 
 class WifiScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -33,6 +47,11 @@ class WifiScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         threading.Thread(target=self._load_current, daemon=True).start()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -142,7 +161,7 @@ class WifiScreen(ctk.CTkFrame):
         ssid_out = get_current_wifi()
         conn_type    = 'Wi-Fi' if 'wifi' in out.lower() else 'Ethernet' if 'ethernet' in out.lower() else 'Unknown'
         connected    = 'connected' in out.lower()
-        self.after(0, self._render_current, conn_type, ssid_out, ip_out, connected)
+        self._safe_after(0, self._render_current, conn_type, ssid_out, ip_out, connected)
 
     def _render_current(self, conn_type, ssid, ip, connected):
         self.curr_info.destroy()
@@ -186,7 +205,7 @@ class WifiScreen(ctk.CTkFrame):
         for proc in ['openvpn','wireguard','nordvpn','expressvpn','tailscale','zerotier']:
             out, _, rc = run(f"pgrep -x {proc} 2>/dev/null")
             if rc == 0: vpn_procs.append(proc)
-        self.after(0, self._render_vpn, vpn_ifaces, vpn_procs)
+        self._safe_after(0, self._render_vpn, vpn_ifaces, vpn_procs)
         if not self._scanning: return
 
         # Saved networks
@@ -196,16 +215,16 @@ class WifiScreen(ctk.CTkFrame):
             parts = line.split(':')
             if len(parts) >= 3 and parts[0]:
                 saved.append({'name': parts[0], 'last': parts[-1]})
-        self.after(0, self._render_saved, saved)
+        self._safe_after(0, self._render_saved, saved)
         if not self._scanning: return
 
         # Rescan and list
         run("nmcli device wifi rescan 2>/dev/null", timeout=5)
         networks = get_wifi_networks()
         
-        self.after(0, self._render_networks, networks)
+        self._safe_after(0, self._render_networks, networks)
         self._scanning = False
-        self.after(0, lambda: (
+        self._safe_after(0, lambda: (
             self.scan_btn.configure(state='normal', text='↺ RESCAN'),
             self.stop_btn.configure(state='disabled'),
             self.status_lbl.configure(text=f"Found {len(networks)} networks", text_color=C['ok'])

@@ -69,6 +69,20 @@ class _CompanionHandler(BaseHTTPRequestHandler):
 
 
 class UsbScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -83,6 +97,11 @@ class UsbScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         threading.Thread(target=self._detect, daemon=True).start()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         # Header
@@ -273,7 +292,7 @@ class UsbScreen(ctk.CTkFrame):
         # Check /system/bin/sh permissions/size
         out, _, rc = _r("adb shell ls -l /system/bin/sh")
         if rc == 0:
-            self.after(0, self._log, f"Shell binary:\n{out}")
+            self._safe_after(0, self._log, f"Shell binary:\n{out}")
         
         # Check hash of app_process (zygote)
         # Try sha256sum, md5sum, or just ls -l
@@ -282,9 +301,9 @@ class UsbScreen(ctk.CTkFrame):
              out, _, rc = _r("adb shell md5sum /system/bin/app_process32 2>/dev/null")
         
         if out:
-            self.after(0, self._log, f"Zygote Hash:\n{out}")
+            self._safe_after(0, self._log, f"Zygote Hash:\n{out}")
         else:
-            self.after(0, self._log, "Could not compute hash (missing tools on phone).")
+            self._safe_after(0, self._log, "Could not compute hash (missing tools on phone).")
 
     # ── Logging ───────────────────────────────────────────────
 
@@ -292,7 +311,7 @@ class UsbScreen(ctk.CTkFrame):
         def _do():
             self.output.insert('end', f"[{time.strftime('%H:%M:%S')}] {msg}\n")
             self.output.see('end')
-        self.after(0, _do)
+        self._safe_after(0, _do)
 
     # ── ADB check ─────────────────────────────────────────────
 
@@ -313,9 +332,9 @@ class UsbScreen(ctk.CTkFrame):
                     'ok', f'✓ ADB Ready  —  {ver[:50]}', '')
                 self.install_adb_btn.pack_forget()
             # Simpler approach
-            self.after(0, lambda: self.install_adb_btn.pack_forget())
+            self._safe_after(0, lambda: self.install_adb_btn.pack_forget())
         else:
-            self.after(0, lambda: self.install_adb_btn.pack(
+            self._safe_after(0, lambda: self.install_adb_btn.pack(
                 anchor='w', padx=12, pady=(0,4)))
             self._log("ADB not installed — tap INSTALL ADB in the setup section")
 
@@ -323,7 +342,7 @@ class UsbScreen(ctk.CTkFrame):
 
     def _detect(self):
         if not shutil.which('adb'):
-            self.after(0, lambda: (
+            self._safe_after(0, lambda: (
                 self.dev_lbl.configure(text='● ADB needed', text_color=C['wn']),
                 self.dev_info.configure(
                     text='Install ADB first — see section 01 above',
@@ -347,7 +366,7 @@ class UsbScreen(ctk.CTkFrame):
                    "4. Tap ↺ RESCAN above")
             col = C['am'] if unauth else C['wn']
             self._device = None
-            self.after(0, lambda: (
+            self._safe_after(0, lambda: (
                 self.dev_lbl.configure(text='● No device', text_color=col),
                 self.dev_info.configure(text=msg, text_color=col)
             ))
@@ -366,7 +385,7 @@ class UsbScreen(ctk.CTkFrame):
 
         info = (f"✓  {brand} {model}\n"
                 f"Android {android}  •  Battery {bat_pct}  •  {serial}")
-        self.after(0, lambda: (
+        self._safe_after(0, lambda: (
             self.dev_lbl.configure(
                 text=f"● {brand} {model}", text_color=C['ok']),
             self.dev_info.configure(text=info, text_color=C['ok'])
@@ -418,20 +437,20 @@ class UsbScreen(ctk.CTkFrame):
             self._log("⚠ No phone connected.")
             self._log("  Connect USB cable → Enable USB Debugging → Tap Allow → Tap ↺ RESCAN")
             return
-        self.after(0, lambda: self.comp_btn.configure(
+        self._safe_after(0, lambda: self.comp_btn.configure(
             state='disabled', text='⟳  Starting...'))
-        self.after(0, lambda: self.comp_prog.set(0.1))
+        self._safe_after(0, lambda: self.comp_prog.set(0.1))
         threading.Thread(target=self._do_install_companion, daemon=True).start()
 
     def _do_install_companion(self):
         # Step 1: Start local HTTP server on desktop
         if not self._start_companion_server():
-            self.after(0, lambda: self.comp_btn.configure(
+            self._safe_after(0, lambda: self.comp_btn.configure(
                 state='normal', text='🚀  OPEN COMPANION ON PHONE (USB)'))
-            self.after(0, lambda: self.comp_prog.set(0))
+            self._safe_after(0, lambda: self.comp_prog.set(0))
             return
 
-        self.after(0, lambda: self.comp_prog.set(0.35))
+        self._safe_after(0, lambda: self.comp_prog.set(0.35))
 
         # Step 2: adb reverse — tunnels phone's localhost:PORT → desktop:PORT
         # This is an ADB transport feature, works on all Android versions including 16
@@ -447,13 +466,13 @@ class UsbScreen(ctk.CTkFrame):
             if fwd_rc2 != 0:
                 self._log(f"✗ Port-forward failed: {fwd_err2.strip()}")
                 self._log("  Try: re-plug USB cable and tap ↺ RESCAN")
-                self.after(0, lambda: self.comp_btn.configure(
+                self._safe_after(0, lambda: self.comp_btn.configure(
                     state='normal', text='🚀  OPEN COMPANION ON PHONE (USB)'))
-                self.after(0, lambda: self.comp_prog.set(0))
+                self._safe_after(0, lambda: self.comp_prog.set(0))
                 return
 
         self._log(f"✓ Port-forward active on port {self._comp_port}")
-        self.after(0, lambda: self.comp_prog.set(0.65))
+        self._safe_after(0, lambda: self.comp_prog.set(0.65))
 
         # Step 3: Open http://localhost:PORT on phone browser
         # Android 16 am start syntax — must use -p for package (positional arg removed)
@@ -507,8 +526,8 @@ class UsbScreen(ctk.CTkFrame):
                 if pkg:
                     self._log(f"  ↳ {pkg.group(1)}: not found, trying next...")
 
-        self.after(0, lambda: self.comp_prog.set(1.0))
-        self.after(0, lambda: self.comp_btn.configure(
+        self._safe_after(0, lambda: self.comp_prog.set(1.0))
+        self._safe_after(0, lambda: self.comp_btn.configure(
             state='normal', text='🚀  OPEN COMPANION ON PHONE (USB)'))
 
         if opened:

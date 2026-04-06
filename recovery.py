@@ -13,6 +13,20 @@ from utils import run_cmd as _r
 
 
 class RecoveryScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app     = app
@@ -28,6 +42,11 @@ class RecoveryScreen(ctk.CTkFrame):
         threading.Thread(target=self._detect_device, daemon=True).start()
 
     # ── UI BUILD ─────────────────────────────────────────────────
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         # Header
@@ -192,7 +211,7 @@ class RecoveryScreen(ctk.CTkFrame):
     def _detect_device(self):
         # Check ADB
         if not shutil.which('adb'):
-            self.after(0, lambda: self.dev_info.configure(
+            self._safe_after(0, lambda: self.dev_info.configure(
                 text="ADB not installed. Go to USB Sync tab → Install ADB.",
                 text_color=C['wn']))
             return
@@ -202,7 +221,7 @@ class RecoveryScreen(ctk.CTkFrame):
         lines = [l for l in out.split('\n')[1:]
                  if '\t' in l and 'offline' not in l and 'unauthorized' not in l]
         if not lines:
-            self.after(0, lambda: self.dev_info.configure(
+            self._safe_after(0, lambda: self.dev_info.configure(
                 text="No device found. Connect USB cable and enable USB Debugging.",
                 text_color=C['wn']))
             self._device = None
@@ -231,7 +250,7 @@ class RecoveryScreen(ctk.CTkFrame):
         info = (f"✓  {brand} {model}  ·  Android {android}  ·  {serial}\n"
                 f"   Root: {root_str}{storage_info}")
 
-        self.after(0, lambda: self.dev_info.configure(
+        self._safe_after(0, lambda: self.dev_info.configure(
             text=info,
             text_color=C['ok'] if self._rooted else C['tx']))
         self._log(f"Connected: {brand} {model} (Android {android})")
@@ -822,7 +841,7 @@ class RecoveryScreen(ctk.CTkFrame):
                 task()
             self._log("\n=== FULL RECOVERY COMPLETE ===")
             self._log(f"Output folder: {self._get_out_dir()}")
-            self.after(0, lambda: self.prog_lbl.configure(
+            self._safe_after(0, lambda: self.prog_lbl.configure(
                 text="✓ Full recovery complete", text_color=C['ok']))
 
         threading.Thread(target=_run_all, daemon=True).start()
@@ -874,13 +893,13 @@ class RecoveryScreen(ctk.CTkFrame):
                 command=lambda p=str(path): self._open_path(p),
                 variant='ghost', width=70
                 ).pack(side='right', padx=8, pady=6)
-        self.after(0, _do)
+        self._safe_after(0, _do)
 
     def _log(self, msg):
         def _do():
             self.log_box.insert('end', msg + '\n')
             self.log_box.see('end')
-        self.after(0, _do)
+        self._safe_after(0, _do)
 
     def _set_prog(self, val, msg=''):
         def _do():
@@ -888,7 +907,7 @@ class RecoveryScreen(ctk.CTkFrame):
             if msg:
                 col = C['ok'] if val >= 1.0 else C['ac']
                 self.prog_lbl.configure(text=msg, text_color=col)
-        self.after(0, _do)
+        self._safe_after(0, _do)
 
     def _clear_log(self):
         self.log_box.delete('1.0', 'end')

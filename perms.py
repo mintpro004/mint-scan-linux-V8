@@ -7,6 +7,20 @@ from utils import run_cmd, check_root
 
 
 class PermsScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -17,6 +31,11 @@ class PermsScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         threading.Thread(target=self._load, daemon=True).start()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -87,7 +106,7 @@ class PermsScreen(ctk.CTkFrame):
         aa_out, _, _ = run_cmd('aa-status --brief 2>/dev/null || apparmor_status 2>/dev/null | head -2')
         results['apparmor'] = aa_out[:80] if aa_out else 'Not active'
 
-        self.after(0, self._render, results)
+        self._safe_after(0, self._render, results)
 
     def _render(self, r):
         for w in self.sys_frame.winfo_children(): w.destroy()

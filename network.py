@@ -287,6 +287,17 @@ class NetworkScreen(ctk.CTkFrame):
         self._start_ping()
         threading.Thread(target=self._load, daemon=True).start()
 
+    def on_blur(self):
+        """Stop background threads when leaving this tab."""
+        self._ping_running    = False
+        self._traffic_running = False
+        if self._traffic_proc:
+            try:
+                self._traffic_proc.terminate()
+            except Exception:
+                pass
+            self._traffic_proc = None
+
     # ── BUILD ─────────────────────────────────────────────────────
 
     def _build(self):
@@ -507,17 +518,28 @@ class NetworkScreen(ctk.CTkFrame):
             time.sleep(2)
 
     def _update_ping(self, ms):
+        # Guard: widget may be destroyed if tab was switched
+        try:
+            if not self.winfo_exists():
+                return
+            if not hasattr(self, '_ping_val') or not self._ping_val.winfo_exists():
+                return
+        except Exception:
+            return
         col = C['ok'] if ms < 30 else C['am'] if ms < 80 else C['wn']
-        self._ping_val.configure(text=f'{ms:.0f} ms', text_color=col)
-        self._ping_graph.push(ms)
-        h = self._ping_hist
-        if h:
-            mn = min(h); av = sum(h)/len(h); mx = max(h)
-            jit = max(h) - min(h)
-            self._ping_min.configure(text=f'MIN: {mn:.0f}ms')
-            self._ping_avg.configure(text=f'AVG: {av:.0f}ms')
-            self._ping_max.configure(text=f'MAX: {mx:.0f}ms')
-            self._ping_jitter.configure(text=f'JITTER: {jit:.0f}ms')
+        try:
+            self._ping_val.configure(text=f'{ms:.0f} ms', text_color=col)
+            self._ping_graph.push(ms)
+            h = self._ping_hist
+            if h:
+                mn = min(h); av = sum(h)/len(h); mx = max(h)
+                jit = max(h) - min(h)
+                self._ping_min.configure(text=f'MIN: {mn:.0f}ms')
+                self._ping_avg.configure(text=f'AVG: {av:.0f}ms')
+                self._ping_max.configure(text=f'MAX: {mx:.0f}ms')
+                self._ping_jitter.configure(text=f'JITTER: {jit:.0f}ms')
+        except Exception:
+            pass
 
     # ── SPEED TEST ────────────────────────────────────────────────
 
@@ -727,9 +749,16 @@ class NetworkScreen(ctk.CTkFrame):
                                             text_color=C['mu'])))
 
     def _tlog_line(self, msg):
-        ts = time.strftime('%H:%M:%S')
-        self._tlog.insert('end', f'[{ts}] {msg}\n')
-        self._tlog.see('end')
+        try:
+            if not self.winfo_exists():
+                return
+            if not hasattr(self, '_tlog') or not self._tlog.winfo_exists():
+                return
+            ts = time.strftime('%H:%M:%S')
+            self._tlog.insert('end', f'[{ts}] {msg}\n')
+            self._tlog.see('end')
+        except Exception:
+            pass
 
     def _analyze(self):
         txt = self._tlog.get('1.0','end').strip()

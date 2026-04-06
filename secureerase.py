@@ -75,6 +75,20 @@ def shred_folder(folder: str, passes: int = 3, log_fn=None):
 
 
 class SecureEraseScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app    = app
@@ -84,6 +98,11 @@ class SecureEraseScreen(ctk.CTkFrame):
         if not self._built:
             self._build()
             self._built = True
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -209,14 +228,14 @@ class SecureEraseScreen(ctk.CTkFrame):
         def _bg():
             if os.path.isdir(target):
                 ok, total = shred_folder(target, passes, self._ulog)
-                self.after(0, self._ulog,
+                self._safe_after(0, self._ulog,
                     f'Done: {ok}/{total} files erased.')
             else:
                 success, msg = shred_file(target, passes, self._ulog)
-                self.after(0, self._ulog, msg)
-            self.after(0, self._erase_btn.configure,
+                self._safe_after(0, self._ulog, msg)
+            self._safe_after(0, self._erase_btn.configure,
                        {'state': 'normal', 'text': '☢ SECURE ERASE NOW'})
-            self.after(0, self._path_lbl.configure,
+            self._safe_after(0, self._path_lbl.configure,
                        {'text': 'Done — select another target.',
                         'text_color': C['ok']})
             self._selected = None
@@ -229,5 +248,5 @@ class SecureEraseScreen(ctk.CTkFrame):
             self._log.insert('end', f'[{ts}] {msg}\n')
             self._log.see('end')
             self._log.configure(state='disabled')
-        self.after(0, _do)
+        self._safe_after(0, _do)
 

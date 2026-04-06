@@ -11,6 +11,20 @@ from utils import run_cmd as _r
 
 
 class ApkScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -22,6 +36,11 @@ class ApkScreen(ctk.CTkFrame):
             self._build()
             self._built = True
         threading.Thread(target=self._detect, daemon=True).start()
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=52, corner_radius=0)
@@ -150,11 +169,11 @@ class ApkScreen(ctk.CTkFrame):
             self.output.insert('end', f"[{time.strftime('%H:%M:%S')}] {msg}\n")
             self.output.see('end')
             self.output.configure(state='disabled')
-        self.after(0, _do)
+        self._safe_after(0, _do)
 
     def _detect(self):
         if not shutil.which('adb'):
-            self.after(0, lambda: (
+            self._safe_after(0, lambda: (
                 self.dev_lbl.configure(text='● ADB not installed', text_color=C['wn']),
                 self.dev_info.configure(text='Install ADB first — see setup section above.')
             ))
@@ -163,7 +182,7 @@ class ApkScreen(ctk.CTkFrame):
         lines = [l for l in out.split('\n')[1:] if '\t' in l and 'offline' not in l]
         if not lines:
             self._device = None
-            self.after(0, lambda: (
+            self._safe_after(0, lambda: (
                 self.dev_lbl.configure(text='● No device', text_color=C['wn']),
                 self.dev_info.configure(
                     text='No Android device found.\n'
@@ -182,7 +201,7 @@ class ApkScreen(ctk.CTkFrame):
         bat_pct = re.search(r'level: (\d+)', bat)
         info = (f"✓ {brand} {model}  •  Android {android}  "
                 f"•  Battery {bat_pct.group(1)+'%' if bat_pct else '—'}")
-        self.after(0, lambda: (
+        self._safe_after(0, lambda: (
             self.dev_lbl.configure(text=f"● {brand} {model}", text_color=C['ok']),
             self.dev_info.configure(text=info, text_color=C['ok'])
         ))
@@ -221,10 +240,10 @@ class ApkScreen(ctk.CTkFrame):
         if self.opt_grant.get():     flags.append('-g')
         if self.opt_downgrade.get(): flags.append('-d')
         cmd = f"adb -s {self._device} install {' '.join(flags)} '{path}'"
-        self.after(0, lambda: self.prog.set(0.4))
+        self._safe_after(0, lambda: self.prog.set(0.4))
         self._log(f"Running: adb install {' '.join(flags)} ...")
         out, err, rc = _r(cmd, timeout=120)
-        self.after(0, lambda: self.prog.set(1.0))
+        self._safe_after(0, lambda: self.prog.set(1.0))
         if 'Success' in out or rc == 0:
             self._log("✓ INSTALLATION SUCCESSFUL")
         else:
@@ -233,7 +252,7 @@ class ApkScreen(ctk.CTkFrame):
                 self._log("→ Fix: Settings → Security → Install Unknown Apps → Allow")
             elif 'VERSION_DOWNGRADE' in (out+err):
                 self._log("→ Fix: Enable 'Allow downgrade' option above")
-        self.after(0, lambda: self.install_btn.configure(
+        self._safe_after(0, lambda: self.install_btn.configure(
             state='normal', text='📦 INSTALL APK TO PHONE'))
 
     def _list_apps(self):

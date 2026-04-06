@@ -112,11 +112,11 @@ echo -e "${GREEN}  ✓ Done${NC}"
 echo -e "${YELLOW}[3/7] Setting up Python environment...${NC}"
 [ ! -d "venv" ] && python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-# Optional extras (tray, desktop notifications, PDF export)
-pip install pystray pillow plyer reportlab 2>/dev/null || true
+pip install -q --upgrade pip 2>/dev/null
 pip install -q -r requirements.txt 2>/dev/null || \
     pip install -q customtkinter requests psutil netifaces pillow darkdetect 2>/dev/null
+# Optional: system tray, notifications, PDF export (non-fatal if unavailable)
+pip install -q pystray plyer reportlab 2>/dev/null || true
 echo -e "${GREEN}  ✓ Done${NC}"
 
 # ── [4/7] Heal widgets.py ─────────────────────────────────────

@@ -110,6 +110,20 @@ def do_git_update(log_fn=None):
 
 
 class UpdaterScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app    = app
@@ -119,6 +133,11 @@ class UpdaterScreen(ctk.CTkFrame):
         if not self._built:
             self._build()
             self._built = True
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -185,14 +204,14 @@ class UpdaterScreen(ctk.CTkFrame):
             self._log_box.insert('end', msg + '\n')
             self._log_box.see('end')
             self._log_box.configure(state='disabled')
-        self.after(0, _do)
+        self._safe_after(0, _do)
 
     def _check(self):
         self._status_lbl.configure(text='Checking GitHub...', text_color=C['ac'])
         self._ulog('Connecting to GitHub API...')
         def _bg():
             result = check_for_update()
-            self.after(0, self._show_result, result)
+            self._safe_after(0, self._show_result, result)
         threading.Thread(target=_bg, daemon=True).start()
 
     def _show_result(self, result):

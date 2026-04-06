@@ -73,6 +73,20 @@ def severity_color(sev: str) -> str:
 
 
 class CVELookupScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app    = app
@@ -82,6 +96,11 @@ class CVELookupScreen(ctk.CTkFrame):
         if not self._built:
             self._build()
             self._built = True
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -142,7 +161,7 @@ class CVELookupScreen(ctk.CTkFrame):
             font=MONO_SM, text_color=C['ac']).pack(pady=8)
         def _bg():
             results = search_cves(q)
-            self.after(0, self._show_results, results, q)
+            self._safe_after(0, self._show_results, results, q)
         threading.Thread(target=_bg, daemon=True).start()
 
     def _quick_scan(self):
@@ -160,14 +179,14 @@ class CVELookupScreen(ctk.CTkFrame):
                 out, _, rc = run_cmd(cmd)
                 if rc == 0 and out.strip():
                     services.append(f'{svc} {out.strip()[:40]}')
-            self.after(0, self._quick_lbl.configure,
+            self._safe_after(0, self._quick_lbl.configure,
                        {'text': f'Found: {", ".join(services) or "none"}',
                         'text_color': C['tx']})
             all_cves = []
             for svc in services[:4]:
                 cves = search_cves(svc, results=3)
                 all_cves.extend(cves)
-            self.after(0, self._show_results, all_cves, 'local services')
+            self._safe_after(0, self._show_results, all_cves, 'local services')
         threading.Thread(target=_bg, daemon=True).start()
 
     def _show_results(self, results, query):

@@ -123,7 +123,7 @@ class AuditorScreen(ctk.CTkFrame):
                 try:
                     with open(b, "rb") as f:
                         hashes[b] = hashlib.sha256(f.read()).hexdigest()
-                except:
+                except Exception:
                     pass
         try:
             with open(self._baseline_file, 'w') as f:
@@ -149,7 +149,7 @@ class AuditorScreen(ctk.CTkFrame):
                         new_hash = hashlib.sha256(f.read()).hexdigest()
                     if new_hash != old_hash:
                         changed.append(b)
-                except:
+                except Exception:
                     pass
             else:
                 changed.append(f"{b} (MISSING)")

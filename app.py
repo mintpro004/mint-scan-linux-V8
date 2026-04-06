@@ -54,6 +54,8 @@ ALL_TABS = [
     ('daemon',      'Daemon',       '⚙'),
     ('updater',     'Updater',      '🔄'),
     ('plugins',     'Plugins',      '🔌'),
+    ('marketplace', 'Marketplace',  '🛍'),
+    ('terminal',    'Terminal',     '>_'),
     ('settings',    'Settings',     '⚙'),
 ]
 
@@ -165,11 +167,30 @@ class MintScanApp:
             _log.warning(f'Plugin load failed: {e}')
 
     def _show_toast(self, title, msg, level):
-        """Show in-app toast notification."""
-        import tkinter.messagebox as mb
-        if level == 'CRITICAL':
-            self.root.after(0, lambda: mb.showwarning(
-                f'⚠ {title}', msg, parent=self.root))
+        """Show non-blocking in-app notification banner."""
+        def _do():
+            try:
+                import customtkinter as ctk
+                banner = ctk.CTkToplevel(self.root)
+                banner.overrideredirect(True)
+                banner.attributes('-topmost', True)
+                w, h = 420, 70
+                sw = self.root.winfo_screenwidth()
+                sh = self.root.winfo_screenheight()
+                banner.geometry(f'{w}x{h}+{sw - w - 20}+{sh - h - 60}')
+                col = C['wn'] if level == 'CRITICAL' else C['am']
+                banner.configure(fg_color=C['sf'])
+                import tkinter as tk
+                tk.Label(banner, text=f'⚠ {title}',
+                         font=('Courier', 10, 'bold'),
+                         fg=col, bg=C['sf']).pack(anchor='w', padx=10, pady=(8,0))
+                tk.Label(banner, text=msg[:80],
+                         font=('Courier', 9),
+                         fg=C['tx'], bg=C['sf']).pack(anchor='w', padx=10)
+                banner.after(6000, banner.destroy)
+            except Exception:
+                pass
+        self.root.after(0, _do)
 
     # ── MAIN UI ───────────────────────────────────────────────
 
@@ -235,7 +256,7 @@ class MintScanApp:
             try:
                 return getattr(_il.import_module(mod), cls)
             except Exception as e:
-                print(f"  [skip] {mod}: {e}")
+                _log.debug(f"[skip] {mod}: {e}")
                 return None
 
         screen_map = {
@@ -270,6 +291,8 @@ class MintScanApp:
             'daemon':      _safe('daemon',      'DaemonScreen'),
             'updater':     _safe('updater',     'UpdaterScreen'),
             'plugins':     _safe('plugins',     'PluginScreen'),
+            'marketplace': _safe('marketplace', 'MarketplaceScreen'),
+            'terminal':    _safe('terminal',    'TerminalScreen'),
         }
         # Only keep successfully loaded screens
         screen_map = {k: v for k, v in screen_map.items() if v is not None}
@@ -311,7 +334,7 @@ class MintScanApp:
                 frame.place(relwidth=1, relheight=1)
                 self._frames[key] = frame
             except Exception as e:
-                print(f"  [error] {key}: {e}")
+                _log.warning(f"[error] {key}: {e}")
 
         # Start on dash
         first = 'dash' if 'dash' in self._frames else (
@@ -342,6 +365,7 @@ class MintScanApp:
         import widgets
         import dash, perms, wifi, calls, network, battery, threats, notifs
         import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, auditor, guardian, settings, wireless, devscan, recovery
+        import cvelookup, secureerase, vpn, ids, webmonitor, daemon, updater, plugins, marketplace, terminal
         
         # Force reload of modules that use fonts/colors
         importlib.reload(widgets)
@@ -369,6 +393,12 @@ class MintScanApp:
         importlib.reload(wireless)
         importlib.reload(devscan)
         importlib.reload(recovery)
+        for _mod in [cvelookup, secureerase, vpn, ids, webmonitor,
+                     daemon, updater, plugins, marketplace, terminal]:
+            try:
+                importlib.reload(_mod)
+            except Exception:
+                pass
 
         # Re-create sidebar and content areas in the same container
         self.sidebar = ScrollableFrame(self.container, width=190,
@@ -409,6 +439,16 @@ class MintScanApp:
             'auditor':     auditor.AuditorScreen,
             'guardian':    guardian.GuardianScreen,
             'settings':    settings.SettingsScreen,
+            'cvelookup':   cvelookup.CVELookupScreen,
+            'secureerase': secureerase.SecureEraseScreen,
+            'vpn':         vpn.VPNScreen,
+            'ids':         ids.IDSScreen,
+            'webmonitor':  webmonitor.WebMonitorScreen,
+            'daemon':      daemon.DaemonScreen,
+            'updater':     updater.UpdaterScreen,
+            'plugins':     plugins.PluginScreen,
+            'marketplace': marketplace.MarketplaceScreen,
+            'terminal':    terminal.TerminalScreen,
         }
 
         # Rebuild sidebar buttons
@@ -447,7 +487,7 @@ class MintScanApp:
                 frame.place(relwidth=1, relheight=1)
                 self._frames[key] = frame
             except Exception as e:
-                print(f"  [error] {key}: {e}")
+                _log.warning(f"[error] {key}: {e}")
 
         # Restore tab
         if current in self._frames:
@@ -465,6 +505,13 @@ class MintScanApp:
     def _switch_tab(self, key):
         if key not in self._frames:
             return
+        # Blur previous tab so background threads stop
+        prev = self.current_tab
+        if prev and prev in self._frames and prev != key:
+            try:
+                self._frames[prev].on_blur()
+            except AttributeError:
+                pass  # not all screens have on_blur
         # Hide all frames
         for frame in self._frames.values():
             frame.place_forget()

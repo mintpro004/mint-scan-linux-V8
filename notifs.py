@@ -8,6 +8,20 @@ from installer import install_kdeconnect
 
 
 class NotifsScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -19,6 +33,11 @@ class NotifsScreen(ctk.CTkFrame):
         if not self._built:
             self._build()
             self._built = True
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -121,14 +140,14 @@ class NotifsScreen(ctk.CTkFrame):
                                 'risk': self._assess_risk(summary, body_txt),
                             }
                             self._notifs.insert(0, notif)
-                            self.after(0, self._render_notifs)
+                            self._safe_after(0, self._render_notifs)
                         app_name = summary = body_txt = ''
         except FileNotFoundError:
-            self.after(0, lambda: self.mon_status.configure(
+            self._safe_after(0, lambda: self.mon_status.configure(
                 text='● dbus-monitor not found — install: sudo apt install dbus',
                 text_color=C['wn']))
         except Exception as e:
-            self.after(0, lambda: self.mon_status.configure(
+            self._safe_after(0, lambda: self.mon_status.configure(
                 text=f'● Error: {str(e)[:60]}', text_color=C['wn']))
 
     def _assess_risk(self, title, body):

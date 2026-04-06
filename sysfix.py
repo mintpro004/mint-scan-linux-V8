@@ -9,6 +9,20 @@ from reports import prompt_save_report
 
 
 class SysFixScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -18,6 +32,11 @@ class SysFixScreen(ctk.CTkFrame):
         if not self._built:
             self._build()
             self._built = True
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
@@ -81,10 +100,10 @@ class SysFixScreen(ctk.CTkFrame):
     def _do_full_scan(self):
         findings = []
 
-        self.after(0, self._log, "Starting comprehensive system scan...")
+        self._safe_after(0, self._log, "Starting comprehensive system scan...")
 
         # 1. Disk health
-        self.after(0, self._log, "Checking disk space...")
+        self._safe_after(0, self._log, "Checking disk space...")
         df_out, _, _ = run("df -h / 2>/dev/null | tail -1")
         if df_out:
             parts = df_out.split()
@@ -99,7 +118,7 @@ class SysFixScreen(ctk.CTkFrame):
                                      None, 'Consider cleaning: sudo apt autoremove'))
 
         # 2. Memory
-        self.after(0, self._log, "Checking memory...")
+        self._safe_after(0, self._log, "Checking memory...")
         mem_out, _, _ = run("free -m 2>/dev/null | grep Mem")
         if mem_out:
             parts = mem_out.split()
@@ -111,7 +130,7 @@ class SysFixScreen(ctk.CTkFrame):
                                      None, 'Check top processes: ps aux --sort=-%mem | head -10'))
 
         # 3. Package updates
-        self.after(0, self._log, "Checking for updates...")
+        self._safe_after(0, self._log, "Checking for updates...")
         upd_out, _, _ = run("apt list --upgradable 2>/dev/null | grep -c upgradable", timeout=15)
         try:
             upd_count = int(upd_out.strip()) - 1
@@ -126,7 +145,7 @@ class SysFixScreen(ctk.CTkFrame):
             pass
 
         # 4. Failed services
-        self.after(0, self._log, "Checking failed services...")
+        self._safe_after(0, self._log, "Checking failed services...")
         failed_out, _, _ = run("systemctl list-units --state=failed --no-legend 2>/dev/null | wc -l")
         try:
             failed = int(failed_out.strip())
@@ -138,7 +157,7 @@ class SysFixScreen(ctk.CTkFrame):
             pass
 
         # 5. Zombie processes
-        self.after(0, self._log, "Checking for zombie processes...")
+        self._safe_after(0, self._log, "Checking for zombie processes...")
         zombie_out, _, _ = run("ps aux 2>/dev/null | awk '$8==\"Z\"' | wc -l")
         try:
             zombies = int(zombie_out.strip())
@@ -149,7 +168,7 @@ class SysFixScreen(ctk.CTkFrame):
             pass
 
         # 6. Firewall
-        self.after(0, self._log, "Checking firewall...")
+        self._safe_after(0, self._log, "Checking firewall...")
         ufw_out, _, _ = run("ufw status 2>/dev/null | head -1")
         if 'inactive' in ufw_out.lower():
             findings.append(('HIGH', 'Firewall is DISABLED',
@@ -157,28 +176,28 @@ class SysFixScreen(ctk.CTkFrame):
                              'Enable: sudo ufw enable'))
 
         # 7. Automatic updates
-        self.after(0, self._log, "Checking auto-updates...")
+        self._safe_after(0, self._log, "Checking auto-updates...")
         auto_out, _, _ = run("dpkg -l unattended-upgrades 2>/dev/null | grep '^ii' | wc -l")
         if auto_out.strip() == '0':
             findings.append(('MED', 'Automatic security updates not configured',
                              None, 'Install: sudo apt install unattended-upgrades && sudo dpkg-reconfigure -plow unattended-upgrades'))
 
         # 8. Temp files
-        self.after(0, self._log, "Checking temp files...")
+        self._safe_after(0, self._log, "Checking temp files...")
         tmp_out, _, _ = run("du -sh /tmp 2>/dev/null | cut -f1")
-        self.after(0, self._log, f"  /tmp size: {tmp_out}")
+        self._safe_after(0, self._log, f"  /tmp size: {tmp_out}")
 
         # 9. Log file sizes
-        self.after(0, self._log, "Checking log sizes...")
+        self._safe_after(0, self._log, "Checking log sizes...")
         log_out, _, _ = run("du -sh /var/log 2>/dev/null | cut -f1")
-        self.after(0, self._log, f"  /var/log size: {log_out}")
+        self._safe_after(0, self._log, f"  /var/log size: {log_out}")
 
         if not findings:
             findings.append(('OK', '✓ System is healthy',
                              None, 'All checks passed. System is in good condition.'))
 
-        self.after(0, self._log, f"✓ Scan complete. {len(findings)} finding(s).")
-        self.after(0, self._render_findings, findings)
+        self._safe_after(0, self._log, f"✓ Scan complete. {len(findings)} finding(s).")
+        self._safe_after(0, self._render_findings, findings)
 
     def _render_findings(self, findings):
         for w in self.results_frame.winfo_children(): w.destroy()
@@ -207,8 +226,8 @@ class SysFixScreen(ctk.CTkFrame):
     def _run_fix(self, cmd, title):
         self._log(f"Running fix: {title}")
         threading.Thread(target=lambda: (
-            self.after(0, self._log, f"$ {cmd}"),
-            (lambda out, err, rc: self.after(0, self._log,
+            self._safe_after(0, self._log, f"$ {cmd}"),
+            (lambda out, err, rc: self._safe_after(0, self._log,
              f"{'✓ Done' if rc==0 else '✗ Failed'}: {out or err}"))(
                 *run(f"sudo {cmd}" if not cmd.startswith('sudo') else cmd, timeout=60)
             )
@@ -216,49 +235,49 @@ class SysFixScreen(ctk.CTkFrame):
 
     def _update_system(self):
         threading.Thread(target=lambda: (
-            self.after(0, self._log, "Updating package list..."),
-            (lambda o,e,r: self.after(0, self._log, f"apt update: {o[-100:] if o else e[-80:]}"))(
+            self._safe_after(0, self._log, "Updating package list..."),
+            (lambda o,e,r: self._safe_after(0, self._log, f"apt update: {o[-100:] if o else e[-80:]}"))(
                 *run("sudo apt-get update -q", timeout=60)),
-            self.after(0, self._log, "Upgrading packages..."),
-            (lambda o,e,r: self.after(0, self._log, f"apt upgrade: {'Done' if r==0 else e[-80:]}"))(
+            self._safe_after(0, self._log, "Upgrading packages..."),
+            (lambda o,e,r: self._safe_after(0, self._log, f"apt upgrade: {'Done' if r==0 else e[-80:]}"))(
                 *run("sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q", timeout=120)),
-            self.after(0, self._log, "✓ System update complete")
+            self._safe_after(0, self._log, "✓ System update complete")
         ), daemon=True).start()
 
     def _clean_packages(self):
         threading.Thread(target=lambda: (
-            self.after(0, self._log, "Cleaning unused packages..."),
-            (lambda o,e,r: self.after(0, self._log, o[-200:] or e[-80:]))(
+            self._safe_after(0, self._log, "Cleaning unused packages..."),
+            (lambda o,e,r: self._safe_after(0, self._log, o[-200:] or e[-80:]))(
                 *run("sudo DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && sudo apt-get autoclean -y", timeout=60)),
-            self.after(0, self._log, "✓ Package cleanup done")
+            self._safe_after(0, self._log, "✓ Package cleanup done")
         ), daemon=True).start()
 
     def _check_disk(self):
         threading.Thread(target=lambda: (
-            self.after(0, self._log, "Disk usage:"),
-            (lambda o,e,r: self.after(0, self._log, o))(
+            self._safe_after(0, self._log, "Disk usage:"),
+            (lambda o,e,r: self._safe_after(0, self._log, o))(
                 *run("df -h 2>/dev/null")),
-            self.after(0, self._log, "\nLargest directories in home:"),
-            (lambda o,e,r: self.after(0, self._log, o))(
+            self._safe_after(0, self._log, "\nLargest directories in home:"),
+            (lambda o,e,r: self._safe_after(0, self._log, o))(
                 *run("du -sh ~/.[^.]* ~/* 2>/dev/null | sort -rh | head -10"))
         ), daemon=True).start()
 
     def _fix_permissions(self):
         threading.Thread(target=lambda: (
-            self.after(0, self._log, "Fixing home directory permissions..."),
-            (lambda o,e,r: self.after(0, self._log, "✓ Permissions fixed" if r==0 else e))(
+            self._safe_after(0, self._log, "Fixing home directory permissions..."),
+            (lambda o,e,r: self._safe_after(0, self._log, "✓ Permissions fixed" if r==0 else e))(
                 *run(f"chmod 755 ~ && chmod 700 ~/.ssh 2>/dev/null || true", timeout=10)),
-            self.after(0, self._log, "Checking for world-readable sensitive files..."),
-            (lambda o,e,r: self.after(0, self._log, f"Found: {o}" if o else "✓ No issues"))(
+            self._safe_after(0, self._log, "Checking for world-readable sensitive files..."),
+            (lambda o,e,r: self._safe_after(0, self._log, f"Found: {o}" if o else "✓ No issues"))(
                 *run("find ~ -maxdepth 2 -name '*.key' -o -name '*.pem' -o -name 'id_rsa' 2>/dev/null | head -5"))
         ), daemon=True).start()
 
     def _fix_firewall(self):
         threading.Thread(target=lambda: (
-            self.after(0, self._log, "Configuring firewall..."),
-            (lambda o,e,r: self.after(0, self._log, o or e))(
+            self._safe_after(0, self._log, "Configuring firewall..."),
+            (lambda o,e,r: self._safe_after(0, self._log, o or e))(
                 *run("sudo ufw --force enable && sudo ufw default deny incoming && sudo ufw default allow outgoing && sudo ufw allow ssh && sudo ufw status", timeout=15)),
-            self.after(0, self._log, "✓ Firewall enabled with secure defaults")
+            self._safe_after(0, self._log, "✓ Firewall enabled with secure defaults")
         ), daemon=True).start()
 
     def _harden_ssh(self):
@@ -276,18 +295,18 @@ class SysFixScreen(ctk.CTkFrame):
 
     def _clear_temp(self):
         threading.Thread(target=lambda: (
-            self.after(0, self._log, "Clearing temp files..."),
-            (lambda o,e,r: self.after(0, self._log, "✓ Temp cleared" if r==0 else e))(
+            self._safe_after(0, self._log, "Clearing temp files..."),
+            (lambda o,e,r: self._safe_after(0, self._log, "✓ Temp cleared" if r==0 else e))(
                 *run("sudo rm -rf /tmp/* /var/tmp/* 2>/dev/null; sudo journalctl --vacuum-size=100M 2>/dev/null", timeout=20)),
-            self.after(0, self._log, "✓ Done")
+            self._safe_after(0, self._log, "✓ Done")
         ), daemon=True).start()
 
     def _mem_analysis(self):
         threading.Thread(target=lambda: (
-            self.after(0, self._log, "Memory analysis:"),
-            (lambda o,e,r: self.after(0, self._log, o))(
+            self._safe_after(0, self._log, "Memory analysis:"),
+            (lambda o,e,r: self._safe_after(0, self._log, o))(
                 *run("free -h 2>/dev/null")),
-            self.after(0, self._log, "\nTop memory consumers:"),
-            (lambda o,e,r: self.after(0, self._log, o))(
+            self._safe_after(0, self._log, "\nTop memory consumers:"),
+            (lambda o,e,r: self._safe_after(0, self._log, o))(
                 *run("ps aux --sort=-%mem 2>/dev/null | head -8"))
         ), daemon=True).start()

@@ -308,7 +308,7 @@ def prompt_save_report(parent, target: str, report_type: str,
     def do_view():
         fmt  = fmt_var.get()
         path = gen.save_report(fmt=fmt)
-        os.system(f"xdg-open '{path}' &")
+        os.system(f"xdg-open '{path}' 2>/dev/null || evince '{path}' 2>/dev/null || gedit '{path}' 2>/dev/null &")
         popup.destroy()
 
     Btn(btn_row, "💾 SAVE",     command=do_save, variant='primary', width=120).pack(side='left', padx=8)

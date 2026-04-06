@@ -89,6 +89,20 @@ RISK_COLOR = {'CRIT': C['wn'], 'HIGH': C['wn'], 'MED': C['am'], 'LOW': C['ok'], 
 
 
 class DevScanScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app       = app
@@ -102,6 +116,11 @@ class DevScanScreen(ctk.CTkFrame):
             self._built = True
 
     # ── UI BUILD ─────────────────────────────────────────────────
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def _build(self):
         # Header
@@ -250,11 +269,11 @@ class DevScanScreen(ctk.CTkFrame):
             return
 
         self._set_prog(0.95, "Building report...")
-        self.after(0, self._render_all)
+        self._safe_after(0, self._render_all)
         self._set_prog(1.0, f"✓ Scan complete — {total} devices found.")
         self._scanning = False
-        self.after(0, lambda: self.scan_btn.configure(state='normal'))
-        self.after(0, lambda: self.stop_btn.configure(state='disabled'))
+        self._safe_after(0, lambda: self.scan_btn.configure(state='normal'))
+        self._safe_after(0, lambda: self.stop_btn.configure(state='disabled'))
 
     def _discover_hosts(self, subnet):
         devices = []
@@ -751,17 +770,17 @@ class DevScanScreen(ctk.CTkFrame):
         def _do():
             self.log_box.insert('end', msg + '\n')
             self.log_box.see('end')
-        self.after(0, _do)
+        self._safe_after(0, _do)
 
     def _set_prog(self, val, msg=''):
         def _do():
             self.prog_bar.set(val)
             if msg:
                 self.prog_lbl.configure(text=msg)
-        self.after(0, _do)
+        self._safe_after(0, _do)
 
     def _clear(self, frame):
         def _do():
             for w in frame.winfo_children():
                 w.destroy()
-        self.after(0, _do)
+        self._safe_after(0, _do)

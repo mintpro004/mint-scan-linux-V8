@@ -22,6 +22,20 @@ def _is_private_ip(ip):
 
 
 class InvestigateScreen(ctk.CTkFrame):
+    def _safe_after(self, delay, fn, *args):
+        """Thread-safe after() that guards against destroyed widgets."""
+        def _guarded():
+            try:
+                if self.winfo_exists():
+                    fn(*args)
+            except Exception:
+                pass
+        try:
+            self.after(delay, _guarded)
+        except Exception:
+            pass
+
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app = app
@@ -32,6 +46,11 @@ class InvestigateScreen(ctk.CTkFrame):
         if not self._built:
             self._build()
             self._built = True
+
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
 
     def investigate_ip(self, ip, reason=''):
         """Called from other screens to investigate a specific IP"""
@@ -153,7 +172,7 @@ class InvestigateScreen(ctk.CTkFrame):
         self.inv_log.configure(state='disabled')
 
     def _prog(self, val):
-        self.after(0, lambda: self.progress.set(val))
+        self._safe_after(0, lambda: self.progress.set(val))
 
     # ── Quick investigation launchers ─────────────────────────
 
@@ -161,9 +180,9 @@ class InvestigateScreen(ctk.CTkFrame):
         def _do():
             ip, _, _ = _run("curl -s --max-time 5 https://api.ipify.org 2>/dev/null")
             if ip:
-                self.after(0, lambda: self.target_entry.delete(0, 'end'))
-                self.after(0, lambda: self.target_entry.insert(0, ip.strip()))
-                self.after(0, self._start_investigation)
+                self._safe_after(0, lambda: self.target_entry.delete(0, 'end'))
+                self._safe_after(0, lambda: self.target_entry.insert(0, ip.strip()))
+                self._safe_after(0, self._start_investigation)
         threading.Thread(target=_do, daemon=True).start()
 
     def _investigate_connections(self):
@@ -280,8 +299,8 @@ class InvestigateScreen(ctk.CTkFrame):
         self._prog(1.0)
         self._investigating = False
 
-        self.after(0, self._render_results, target, findings, geo_data, net_data, analysis)
-        self.after(0, lambda: self.stop_btn.configure(state='disabled'))
+        self._safe_after(0, self._render_results, target, findings, geo_data, net_data, analysis)
+        self._safe_after(0, lambda: self.stop_btn.configure(state='disabled'))
 
     # ── Geolocation ───────────────────────────────────────────
 
@@ -399,7 +418,7 @@ class InvestigateScreen(ctk.CTkFrame):
         else:
             output = 'whois not available — install with: sudo apt install whois'
 
-        self.after(0, self._show_whois, output)
+        self._safe_after(0, self._show_whois, output)
 
     def _show_whois(self, text):
         self.whois_box.configure(state='normal')
@@ -449,7 +468,7 @@ class InvestigateScreen(ctk.CTkFrame):
                         'title': f'Active connection to external IP: {ip}',
                         'desc':  f'Tap the field above and enter {ip} to investigate this IP',
                     })
-            self.after(0, self._show_whois,
+            self._safe_after(0, self._show_whois,
                        f"Active connections:\n{out}\n\nExternal IPs: {', '.join(external)}")
 
         elif mode == 'ports':
@@ -465,7 +484,7 @@ class InvestigateScreen(ctk.CTkFrame):
                         'title': f'Dangerous port open locally: :{port} ({dangerous[port]})',
                         'desc':  f'This port is associated with {dangerous[port]}. Close it immediately.',
                     })
-            self.after(0, self._show_whois, f"Open ports:\n{out}")
+            self._safe_after(0, self._show_whois, f"Open ports:\n{out}")
 
         elif mode == 'processes':
             self._log("Analysing running processes for threats...")
@@ -481,7 +500,7 @@ class InvestigateScreen(ctk.CTkFrame):
                         'title': f'Suspicious process: {name.strip()}',
                         'desc':  f'Known hacking tool is running: {pid_line[0][:100] if pid_line else ""}',
                     })
-            self.after(0, self._show_whois, f"Running processes:\n{out}")
+            self._safe_after(0, self._show_whois, f"Running processes:\n{out}")
 
     def _investigate_port(self, port, findings):
         self._log(f"Investigating port {port}...")
@@ -498,7 +517,7 @@ class InvestigateScreen(ctk.CTkFrame):
         conns, _, _ = _run(f"ss -tnp 2>/dev/null | grep :{port}")
         if conns:
             self._log(f"  Active connections on :{port}:\n{conns}")
-        self.after(0, self._show_whois,
+        self._safe_after(0, self._show_whois,
                    f"Port :{port} analysis:\n\nListening:\n{out}\n\nConnections:\n{conns}")
 
     def _investigate_process(self, name, findings):
@@ -520,7 +539,7 @@ class InvestigateScreen(ctk.CTkFrame):
                 })
         else:
             self._log(f"  No process named '{name}' found")
-        self.after(0, self._show_whois, f"Process analysis: {name}\n\n{out}")
+        self._safe_after(0, self._show_whois, f"Process analysis: {name}\n\n{out}")
 
     # ── Threat analysis ───────────────────────────────────────
 
@@ -732,7 +751,7 @@ class InvestigateScreen(ctk.CTkFrame):
         def _do():
             out, err, rc = _run(f"sudo ufw deny from {ip} 2>/dev/null")
             msg = f"✓ Blocked {ip}" if rc == 0 else f"✗ Failed: {err[:60]}"
-            self.after(0, self._log, msg)
+            self._safe_after(0, self._log, msg)
         threading.Thread(target=_do, daemon=True).start()
 
     def _copy(self, text):

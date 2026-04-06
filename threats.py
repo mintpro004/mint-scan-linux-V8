@@ -44,6 +44,11 @@ class ThreatsScreen(ctk.CTkFrame):
 
     # ── UI BUILD ──────────────────────────────────────────────────
 
+    def on_blur(self):
+        """Called when switching away from this tab — stop background work."""
+        pass
+
+
     def _build(self):
         # Header
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=52, corner_radius=0)
