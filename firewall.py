@@ -1,7 +1,7 @@
 """Firewall Manager — view all rules, add/remove, configure UFW"""
 import tkinter as tk
 import customtkinter as ctk
-import threading, subprocess, re, time, shutil
+import threading, subprocess, re, time, shutil, os
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from installer import InstallerPopup
 from utils import run_cmd as _run

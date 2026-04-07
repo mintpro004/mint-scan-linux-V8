@@ -441,42 +441,55 @@ class MintScanApp:
                      font=('Courier',7,'bold'), text_color=C['mu']
                      ).pack(anchor='w', padx=12, pady=(10,4))
 
-        # Re-instantiate screens
-        screen_map = {
-            'dash':        dash.DashScreen,
-            'perms':       perms.PermsScreen,
-            'wifi':        wifi.WifiScreen,
-            'calls':       calls.CallsScreen,
-            'network':     network.NetworkScreen,
-            'battery':     battery.BatteryScreen,
-            'threats':     threats.ThreatsScreen,
-            'notifs':      notifs.NotifsScreen,
-            'ports':       ports.PortsScreen,
-            'usb':         usb.UsbScreen,
-            'apk':         usb.ApkScreen,
-            'wireless':    wireless.WirelessScreen,
-            'devscan':     devscan.DevScanScreen,
-            'recovery':    recovery.RecoveryScreen,
-            'netscan':     netscan.NetScanScreen,
-            'malware':     malware.MalwareScreen,
-            'sysfix':      sysfix.SysFixScreen,
-            'firewall':    firewall.FirewallScreen,
-            'toolbox':     toolbox.ToolboxScreen,
-            'investigate': investigate.InvestigateScreen,
-            'auditor':     auditor.AuditorScreen,
-            'guardian':    guardian.GuardianScreen,
-            'settings':    settings.SettingsScreen,
-            'cvelookup':   cvelookup.CVELookupScreen,
-            'secureerase': secureerase.SecureEraseScreen,
-            'vpn':         vpn.VPNScreen,
-            'ids':         ids.IDSScreen,
-            'webmonitor':  webmonitor.WebMonitorScreen,
-            'daemon':      daemon.DaemonScreen,
-            'updater':     updater.UpdaterScreen,
-            'plugins':     plugins.PluginScreen,
-            'marketplace': marketplace.MarketplaceScreen,
-            'terminal':    terminal.TerminalScreen,
-        }
+        # Re-instantiate screens using importlib (mirrors _build_ui; avoids NameError
+        # on module names that are never imported at the top level of this file)
+        import importlib as _il2
+        _base2 = os.path.dirname(os.path.abspath(__file__))
+        if _base2 not in sys.path:
+            sys.path.insert(0, _base2)
+
+        def _safe2(mod, cls):
+            try:
+                return getattr(_il2.import_module(mod), cls)
+            except Exception as e:
+                _log.debug(f"[skip] {mod}: {e}")
+                return None
+
+        screen_map = {k: v for k, v in {
+            'dash':        _safe2('dash',        'DashScreen'),
+            'perms':       _safe2('perms',       'PermsScreen'),
+            'wifi':        _safe2('wifi',        'WifiScreen'),
+            'calls':       _safe2('calls',       'CallsScreen'),
+            'network':     _safe2('network',     'NetworkScreen'),
+            'battery':     _safe2('battery',     'BatteryScreen'),
+            'threats':     _safe2('threats',     'ThreatsScreen'),
+            'notifs':      _safe2('notifs',      'NotifsScreen'),
+            'ports':       _safe2('ports',       'PortsScreen'),
+            'usb':         _safe2('usb',         'UsbScreen'),
+            'apk':         _safe2('usb',         'ApkScreen'),
+            'wireless':    _safe2('wireless',    'WirelessScreen'),
+            'devscan':     _safe2('devscan',     'DevScanScreen'),
+            'recovery':    _safe2('recovery',    'RecoveryScreen'),
+            'netscan':     _safe2('netscan',     'NetScanScreen'),
+            'malware':     _safe2('malware',     'MalwareScreen'),
+            'sysfix':      _safe2('sysfix',      'SysFixScreen'),
+            'firewall':    _safe2('firewall',    'FirewallScreen'),
+            'toolbox':     _safe2('toolbox',     'ToolboxScreen'),
+            'investigate': _safe2('investigate', 'InvestigateScreen'),
+            'auditor':     _safe2('auditor',     'AuditorScreen'),
+            'guardian':    _safe2('guardian',    'GuardianScreen'),
+            'settings':    _safe2('settings',   'SettingsScreen'),
+            'cvelookup':   _safe2('cvelookup',   'CVELookupScreen'),
+            'secureerase': _safe2('secureerase', 'SecureEraseScreen'),
+            'vpn':         _safe2('vpn',         'VPNScreen'),
+            'ids':         _safe2('ids',         'IDSScreen'),
+            'webmonitor':  _safe2('webmonitor',  'WebMonitorScreen'),
+            'daemon':      _safe2('daemon',      'DaemonScreen'),
+            'updater':     _safe2('updater',     'UpdaterScreen'),
+            'plugins':     _safe2('plugins',     'PluginScreen'),
+            'marketplace': _safe2('marketplace', 'MarketplaceScreen'),
+            'terminal':    _safe2('terminal',    'TerminalScreen'),
+        }.items() if v is not None}
 
         # Rebuild sidebar buttons
         visible_tabs = [(k, lbl, icon) for k, lbl, icon in ALL_TABS
