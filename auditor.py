@@ -94,7 +94,7 @@ class AuditorScreen(ctk.CTkFrame):
         while self._monitoring:
             line = proc.stdout.readline()
             if line:
-                self.audit_log.insert('end', line)
+                (self.audit_log.insert('end', line) if self.winfo_exists() else None)
                 self.audit_log.see('end')
             else:
                 time.sleep(0.1)

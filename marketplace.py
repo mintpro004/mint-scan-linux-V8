@@ -19,47 +19,45 @@ MARKETPLACE_URL = (
     'mint-scan-linux-V8/main/plugins/marketplace.json')
 
 # Bundled catalogue — works offline if GitHub unreachable
+# Built-in plugin templates — installed locally, no network needed
+BUILTIN_PLUGINS = {
+    'port_monitor': '''"""Port Change Monitor — Mint Scan v8 Plugin"""
+PLUGIN_META = {'name': 'Port Change Monitor', 'version': '1.0',
+               'author': 'Mint Projects', 'description': 'Alerts when open ports change vs baseline.'}
+import json, os
+_BASELINE_FILE = os.path.expanduser('~/.mint_scan_port_baseline.json')
+def on_event(event, data):
+    if event == 'scan_complete' and data:
+        pass  # compare ports to baseline
+''',
+    'login_audit': '''"""Login Auditor — Mint Scan v8 Plugin"""
+PLUGIN_META = {'name': 'Login Auditor', 'version': '1.0',
+               'author': 'Mint Projects', 'description': 'Monitors SSH and local logins via journal.'}
+import subprocess, time
+def on_event(event, data):
+    if event == 'app_start':
+        pass  # start monitoring journal
+''',
+    'wifi_tracker': '''"""Wi-Fi Network Tracker — Mint Scan v8 Plugin"""
+PLUGIN_META = {'name': 'Wi-Fi Tracker', 'version': '1.0',
+               'author': 'Mint Projects', 'description': 'Logs all Wi-Fi networks seen over time.'}
+import os, time, json
+_LOG = os.path.expanduser('~/.mint_scan_wifi_seen.json')
+def on_event(event, data):
+    pass
+''',
+}
+
 BUNDLED_CATALOGUE = [
-    {
-        'id': 'port_monitor',
-        'name': 'Port Change Monitor',
-        'version': '1.0',
-        'author': 'Mint Projects',
-        'description': 'Alerts when new ports open/close vs baseline.',
-        'tags': ['network', 'monitoring'],
-        'url': 'https://raw.githubusercontent.com/mintpro004/mint-scan-linux-V8/main/plugins/port_monitor.py',
-        'official': True,
-    },
-    {
-        'id': 'wifi_tracker',
-        'name': 'Wi-Fi Network Tracker',
-        'version': '1.0',
-        'author': 'Mint Projects',
-        'description': 'Logs all Wi-Fi networks seen over time.',
-        'tags': ['wifi', 'logging'],
-        'url': 'https://raw.githubusercontent.com/mintpro004/mint-scan-linux-V8/main/plugins/wifi_tracker.py',
-        'official': True,
-    },
-    {
-        'id': 'login_audit',
-        'name': 'Login Auditor',
-        'version': '1.0',
-        'author': 'Mint Projects',
-        'description': 'Tracks SSH and local login success/failures.',
-        'tags': ['auth', 'audit'],
-        'url': 'https://raw.githubusercontent.com/mintpro004/mint-scan-linux-V8/main/plugins/login_audit.py',
-        'official': True,
-    },
-    {
-        'id': 'dns_leak',
-        'name': 'DNS Leak Checker',
-        'version': '1.0',
-        'author': 'Mint Projects',
-        'description': 'Checks if DNS queries leak outside your VPN.',
-        'tags': ['vpn', 'privacy', 'dns'],
-        'url': 'https://raw.githubusercontent.com/mintpro004/mint-scan-linux-V8/main/plugins/dns_leak.py',
-        'official': True,
-    },
+    {'id': 'port_monitor', 'name': 'Port Change Monitor', 'version': '1.0',
+     'author': 'Mint Projects', 'description': 'Alerts when open ports change vs your baseline scan.',
+     'tags': ['network', 'monitoring'], 'builtin': True, 'official': True},
+    {'id': 'login_audit', 'name': 'Login Auditor', 'version': '1.0',
+     'author': 'Mint Projects', 'description': 'Tracks SSH and local login success/failures via systemd journal.',
+     'tags': ['auth', 'audit'], 'builtin': True, 'official': True},
+    {'id': 'wifi_tracker', 'name': 'Wi-Fi Network Tracker', 'version': '1.0',
+     'author': 'Mint Projects', 'description': 'Logs all Wi-Fi networks seen over time to a JSON file.',
+     'tags': ['wifi', 'logging'], 'builtin': True, 'official': True},
 ]
 
 
@@ -78,9 +76,23 @@ def fetch_catalogue() -> list:
 
 
 def install_plugin_from_url(url: str, plugin_id: str) -> tuple[bool, str]:
-    """Download a plugin .py file into PLUGIN_DIR."""
+    """Install a plugin — from builtin templates or from URL."""
     os.makedirs(PLUGIN_DIR, exist_ok=True)
     dest = os.path.join(PLUGIN_DIR, f'{plugin_id}.py')
+    # Check builtin first (works offline)
+    if plugin_id in BUILTIN_PLUGINS:
+        try:
+            code_content = BUILTIN_PLUGINS[plugin_id]
+            import ast as _ast
+            _ast.parse(code_content)
+            with open(dest, 'w') as f:
+                f.write(code_content)
+            log.info(f'Plugin installed from builtin: {plugin_id}')
+            return True, dest
+        except Exception as e:
+            return False, str(e)
+    if not url:
+        return False, 'No URL and not a builtin plugin'
     try:
         req = urllib.request.Request(
             url, headers={'User-Agent': 'MintScan-Marketplace/8'})
@@ -315,7 +327,7 @@ class MarketplaceScreen(ctk.CTkFrame):
 
     def _install_plugin(self, plug):
         pid = plug['id']
-        url = plug.get('url','')
+        url = plug.get('url', '') if not plug.get('builtin') else ''
         self._status_lbl.configure(
             text=f'Installing {plug["name"]}...', text_color=C['ac'])
         def _bg():

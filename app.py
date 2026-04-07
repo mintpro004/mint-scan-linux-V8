@@ -347,58 +347,85 @@ class MintScanApp:
     # ── TAB SWITCHING ─────────────────────────────────────────
 
     def refresh_ui(self):
-        """Called by settings when theme/fonts change to rebuild all screens"""
-        # Save current tab
-        current = self.current_tab
-        
-        # Destroy all screens
-        for frame in self._frames.values():
-            frame.destroy()
-        self._frames = {}
-        
-        # Destroy sidebar and content areas
-        self.sidebar.destroy()
-        self.content.destroy()
-        
-        # Re-initialize modules
-        import importlib
-        import widgets
-        import dash, perms, wifi, calls, network, battery, threats, notifs
-        import ports, usb, netscan, malware, sysfix, firewall, toolbox, investigate, auditor, guardian, settings, wireless, devscan, recovery
-        import cvelookup, secureerase, vpn, ids, webmonitor, daemon, updater, plugins, marketplace, terminal
-        
-        # Force reload of modules that use fonts/colors
-        importlib.reload(widgets)
-        from widgets import C, MONO, MONO_SM, ScrollableFrame
-        importlib.reload(dash)
-        importlib.reload(perms)
-        importlib.reload(wifi)
-        importlib.reload(calls)
-        importlib.reload(network)
-        importlib.reload(battery)
-        importlib.reload(threats)
-        importlib.reload(notifs)
-        importlib.reload(ports)
-        importlib.reload(usb)
-        importlib.reload(wireless)
-        importlib.reload(netscan)
-        importlib.reload(malware)
-        importlib.reload(sysfix)
-        importlib.reload(firewall)
-        importlib.reload(toolbox)
-        importlib.reload(investigate)
-        importlib.reload(auditor)
-        importlib.reload(guardian)
-        importlib.reload(settings)
-        importlib.reload(wireless)
-        importlib.reload(devscan)
-        importlib.reload(recovery)
-        for _mod in [cvelookup, secureerase, vpn, ids, webmonitor,
-                     daemon, updater, plugins, marketplace, terminal]:
+        """
+        Apply theme/font/scale changes WITHOUT rebuilding any screens.
+        This is safe — no frames are destroyed, no threads are killed.
+        """
+        import widgets as _w
+        _log.info('refresh_ui: applying theme without rebuild')
+
+        # 1. Apply colours to the root window and persistent widgets
+        try:
+            self.root.configure(fg_color=C['bg'])
+        except Exception:
+            pass
+        try:
+            self.navbar.configure(fg_color=C['sf'])
+        except Exception:
+            pass
+        try:
+            self.container.configure(fg_color=C['bg'])
+        except Exception:
+            pass
+        try:
+            self.content.configure(fg_color=C['bg'])
+        except Exception:
+            pass
+        try:
+            self.sidebar.configure(fg_color=C['sf'])
+        except Exception:
+            pass
+        try:
+            self.score_lbl.configure(text_color=C['ok'])
+        except Exception:
+            pass
+        try:
+            self.clock_lbl.configure(text_color=C['mu'])
+        except Exception:
+            pass
+
+        # 2. Update all sidebar buttons
+        for k, btn in self._tab_btns.items():
             try:
-                importlib.reload(_mod)
+                is_active = (k == self.current_tab)
+                btn.configure(
+                    fg_color=C['br'] if is_active else 'transparent',
+                    text_color=C['ac'] if is_active else C['mu'],
+                    hover_color=C['br'])
             except Exception:
                 pass
+
+        # 3. Walk all widgets recursively and recolour standard widgets
+        def _recolour(widget):
+            try:
+                cls = type(widget).__name__
+                if cls in ('CTkFrame',):
+                    fc = widget.cget('fg_color')
+                    # Only recolour known background colours
+                    if isinstance(fc, str):
+                        if fc in ('#020c14','#061523','#05111f','#0a1f35'):
+                            widget.configure(fg_color=C['bg'])
+                        elif fc in ('#0a1e2e','#0f2847','#061523'):
+                            widget.configure(fg_color=C['sf'])
+                elif cls == 'CTkLabel':
+                    tc = widget.cget('text_color')
+                    if isinstance(tc, str):
+                        if tc in ('#3a6278','#5a8298','#3a5a70'):
+                            widget.configure(text_color=C['mu'])
+                        elif tc in ('#c8e8f4','#e8f4ff'):
+                            widget.configure(text_color=C['tx'])
+            except Exception:
+                pass
+            try:
+                for child in widget.winfo_children():
+                    _recolour(child)
+            except Exception:
+                pass
+
+        _recolour(self.root)
+
+        # 4. Show confirmation — do NOT call self.app.refresh_ui() again
+        _log.info('refresh_ui: theme applied successfully (no rebuild needed)')
 
         # Re-create sidebar and content areas in the same container
         self.sidebar = ScrollableFrame(self.container, width=190,

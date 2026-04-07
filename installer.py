@@ -91,11 +91,11 @@ class InstallerPopup(ctk.CTkToplevel):
         self.after(0, _do)
 
     def _set_title(self, msg):
-        self.after(0, lambda: self._title_lbl.configure(text=msg))
+        self.after(0, lambda: (None if not self.winfo_exists() else (self._title_lbl.configure(text=msg))))
 
     def _set_status(self, msg, color=None):
-        self.after(0, lambda: self._status_lbl.configure(
-            text=msg, text_color=color or C['mu']))
+        self.after(0, lambda: (None if not self.winfo_exists() else (self._status_lbl.configure(
+            text=msg, text_color=color or C['mu']))))
 
     def _start(self):
         self._prog.start()
@@ -136,9 +136,9 @@ class InstallerPopup(ctk.CTkToplevel):
                 self._set_title("⚠ Completed with errors")
                 self._set_status("Completed with errors", C['am'])
 
-        self.after(0, lambda: self._prog.stop())
-        self.after(0, lambda: self._prog.set(1.0 if not failed_cmds else 0.6))
-        self.after(0, lambda: self._close_btn.configure(state='normal'))
+        self.after(0, lambda: (None if not self.winfo_exists() else (self._prog.stop())))
+        self.after(0, lambda: (None if not self.winfo_exists() else (self._prog.set(1.0 if not failed_cmds else 0.6))))
+        self.after(0, lambda: (None if not self.winfo_exists() else (self._close_btn.configure(state='normal'))))
 
         if self._on_done:
             self.after(500, self._on_done)

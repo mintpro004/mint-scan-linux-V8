@@ -274,8 +274,8 @@ class NetworkScreen(ctk.CTkFrame):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
         self.app             = app
         self._built          = False
-        self._ping_running   = False
-        self._traffic_running= False
+        self._ping_running = False
+        self._traffic_running = False
         self._traffic_proc   = None
         self._find_positions = []
         self._find_idx       = 0
@@ -289,7 +289,7 @@ class NetworkScreen(ctk.CTkFrame):
 
     def on_blur(self):
         """Stop background threads when leaving this tab."""
-        self._ping_running    = False
+        self._ping_running = False
         self._traffic_running = False
         if self._traffic_proc:
             try:

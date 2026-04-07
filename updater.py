@@ -29,33 +29,80 @@ def _parse_ver(s):
 
 def check_for_update(timeout=8):
     """
-    Query GitHub releases API.
-    Returns dict: {available, current, latest, tag, url, notes} or error str.
+    Check for updates via multiple methods:
+    1. GitHub Releases API (if releases published)
+    2. GitHub Tags API (if no releases yet)
+    3. Git log comparison (if local git repo)
     """
+    import urllib.request
+    current = _parse_ver(CURRENT_VER)
+
+    # Method 1: GitHub Releases API
     try:
-        import urllib.request, urllib.error
         req = urllib.request.Request(
             REPO_API, headers={'User-Agent': 'MintScan-Updater/8'})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             data = json.loads(r.read().decode())
-        tag   = data.get('tag_name', CURRENT_VER)
-        notes = (data.get('body') or '')[:600]
-        url   = data.get('html_url', '')
-        latest  = _parse_ver(tag)
-        current = _parse_ver(CURRENT_VER)
-        log.info(f'Update check: current={CURRENT_VER} latest={tag}')
-        return {
-            'available': latest > current,
-            'current':   CURRENT_VER,
-            'latest':    tag,
-            'url':       url,
-            'notes':     notes,
-        }
+        if 'tag_name' in data:
+            tag   = data['tag_name']
+            notes = (data.get('body') or '')[:600]
+            url   = data.get('html_url', '')
+            latest = _parse_ver(tag)
+            log.info(f'Releases API: {CURRENT_VER} → {tag}')
+            return {'available': latest > current, 'current': CURRENT_VER,
+                    'latest': tag, 'url': url, 'notes': notes, 'method': 'releases'}
+        # Repo exists but no releases yet
+        log.info('No releases published yet — checking tags')
     except Exception as e:
-        log.warning(f'Update check failed: {e}')
-        return {'error': str(e), 'available': False,
-                'current': CURRENT_VER, 'latest': '—'}
+        log.info(f'Releases API: {e}')
 
+    # Method 2: Tags API (works before any releases are published)
+    try:
+        tags_url = REPO_API.replace('/releases/latest', '/tags')
+        req = urllib.request.Request(
+            tags_url, headers={'User-Agent': 'MintScan-Updater/8'})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            tags = json.loads(r.read().decode())
+        if tags:
+            tag    = tags[0].get('name', CURRENT_VER)
+            latest = _parse_ver(tag)
+            url    = f"https://github.com/mintpro004/mint-scan-linux-V8/releases/tag/{tag}"
+            log.info(f'Tags API: {CURRENT_VER} → {tag}')
+            return {'available': latest > current, 'current': CURRENT_VER,
+                    'latest': tag, 'url': url,
+                    'notes': 'Update available via git pull', 'method': 'tags'}
+    except Exception as e:
+        log.info(f'Tags API: {e}')
+
+    # Method 3: Local git — compare with remote
+    try:
+        r = subprocess.run('git fetch origin --dry-run 2>&1',
+                           shell=True, capture_output=True, text=True,
+                           cwd=BASE_DIR, timeout=20)
+        behind_out, _, _ = run_cmd(
+            'git rev-list HEAD..origin/main --count 2>/dev/null', timeout=10)
+        try:
+            behind = int(behind_out.strip())
+        except Exception:
+            behind = 0
+        if behind > 0:
+            log.info(f'Git: {behind} commits behind')
+            return {'available': True, 'current': CURRENT_VER,
+                    'latest': f'{CURRENT_VER}+{behind}commits',
+                    'url': 'https://github.com/mintpro004/mint-scan-linux-V8',
+                    'notes': f'{behind} new commit(s) available. Run: bash update.sh',
+                    'method': 'git'}
+        elif behind == 0:
+            return {'available': False, 'current': CURRENT_VER,
+                    'latest': CURRENT_VER,
+                    'notes': 'Up to date with remote.', 'method': 'git'}
+    except Exception as e:
+        log.info(f'Git check: {e}')
+
+    # All methods failed
+    return {'available': False, 'current': CURRENT_VER, 'latest': '—',
+            'notes': 'Could not reach GitHub. Check internet connection.',
+            'error': 'All update checks failed'}
 
 def do_git_update(log_fn=None):
     """
@@ -215,27 +262,36 @@ class UpdaterScreen(ctk.CTkFrame):
         threading.Thread(target=_bg, daemon=True).start()
 
     def _show_result(self, result):
-        if 'error' in result:
+        method = result.get('method', 'unknown')
+        if result.get('error') and not result.get('available'):
             self._status_lbl.configure(
-                text=f'✗ Check failed: {result["error"]}',
-                text_color=C['wn'])
-            self._ulog(f'Error: {result["error"]}')
+                text=f'⚠ Check failed — {result.get("notes","See log")}',
+                text_color=C['am'])
+            self._ulog(f'Check method: {method}')
+            self._ulog(result.get('notes', result.get('error', '')))
             return
 
+        self._ulog(f'Check method: {method}')
         if result['available']:
             self._status_lbl.configure(
-                text=f'⬆ UPDATE AVAILABLE: {result["latest"]} (current: {result["current"]})',
+                text=f'⬆ UPDATE AVAILABLE: {result["latest"]}',
                 text_color=C['am'])
-            self._ulog(f'New version: {result["latest"]}')
-            self._ulog(result.get('notes', '')[:200])
-            Btn(self._status_card, '⬇ INSTALL UPDATE',
-                command=self._do_update, variant='primary', width=180
-                ).pack(pady=8)
+            self._ulog(f'Current: {result["current"]} → Latest: {result["latest"]}')
+            notes = result.get('notes','')
+            if notes:
+                self._ulog(notes[:300])
+            # Remove old update btn if any
+            for w in self._status_card.winfo_children():
+                if hasattr(w,'cget') and 'INSTALL' in str(w.cget('text') if hasattr(w,'cget') else ''):
+                    try: w.destroy()
+                    except Exception: pass
+            Btn(self._status_card, '⬇ GIT PULL UPDATE',
+                command=self._do_update, variant='primary', width=200).pack(pady=8)
         else:
             self._status_lbl.configure(
-                text=f'✓ Up to date — v{result["current"]} is latest',
+                text=f'✓ Up to date (v{result["current"]})',
                 text_color=C['ok'])
-            self._ulog('No update available.')
+            self._ulog(result.get('notes','Already at latest version.'))
 
     def _do_update(self):
         self._ulog('Starting git update...')

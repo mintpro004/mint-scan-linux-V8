@@ -1,10 +1,9 @@
 """
 Mint Scan v8 — VPN Client
-Supports WireGuard and OpenVPN.
-Auto-discovers available WireGuard configs — no path entry needed.
-One-button connect with interface selector dropdown.
+Scans all real config sources including nmcli, /etc/wireguard, and home dirs.
+One-button connect. Shows real status. No hardcoded paths.
 """
-import os, threading, subprocess, time, glob, shutil
+import os, threading, subprocess, time, glob, shutil, re
 import tkinter as tk
 import customtkinter as ctk
 from widgets import (C, MONO, MONO_SM, ScrollableFrame, Card,
@@ -14,31 +13,63 @@ from logger import get_logger
 
 log = get_logger('vpn')
 
-WG_DIRS = ['/etc/wireguard', '/home', os.path.expanduser('~')]
-
 
 def find_wg_configs() -> list:
-    """Scan standard locations for .conf WireGuard config files."""
+    """Find WireGuard .conf files in all standard locations."""
+    dirs = [
+        '/etc/wireguard',
+        os.path.expanduser('~'),
+        os.path.expanduser('~/vpn'),
+        os.path.expanduser('~/wireguard'),
+        os.path.expanduser('~/Downloads'),
+        '/usr/local/etc/wireguard',
+    ]
     found = []
-    for d in ['/etc/wireguard', os.path.expanduser('~'),
-              os.path.expanduser('~/wireguard'),
-              os.path.expanduser('~/vpn')]:
+    for d in dirs:
         if os.path.isdir(d):
-            for f in glob.glob(os.path.join(d, '*.conf')):
-                found.append(f)
+            try:
+                for f in glob.glob(os.path.join(d, '*.conf')):
+                    if os.path.isfile(f):
+                        found.append(f)
+            except PermissionError:
+                pass
     return sorted(set(found))
 
 
 def find_ovpn_configs() -> list:
+    """Find OpenVPN .ovpn files in all standard locations."""
+    dirs = [
+        os.path.expanduser('~'),
+        os.path.expanduser('~/vpn'),
+        os.path.expanduser('~/openvpn'),
+        os.path.expanduser('~/Downloads'),
+        '/etc/openvpn/client',
+        '/etc/openvpn',
+    ]
     found = []
-    for d in [os.path.expanduser('~'),
-              os.path.expanduser('~/vpn'),
-              os.path.expanduser('~/openvpn'),
-              '/etc/openvpn']:
+    for d in dirs:
         if os.path.isdir(d):
-            for f in glob.glob(os.path.join(d, '*.ovpn')):
-                found.append(f)
+            try:
+                for f in glob.glob(os.path.join(d, '*.ovpn')):
+                    if os.path.isfile(f):
+                        found.append(f)
+            except PermissionError:
+                pass
     return sorted(set(found))
+
+
+def get_nmcli_vpn_connections() -> list:
+    """Get VPN connections configured in NetworkManager."""
+    out, _, rc = run_cmd(
+        "nmcli -t -f NAME,TYPE con show 2>/dev/null | grep -i vpn", timeout=5)
+    if rc != 0 or not out.strip():
+        return []
+    conns = []
+    for line in out.strip().splitlines():
+        parts = line.split(':')
+        if parts:
+            conns.append(parts[0].strip())
+    return conns
 
 
 def detect_vpn_tools() -> dict:
@@ -51,275 +82,292 @@ def detect_vpn_tools() -> dict:
 
 
 def get_vpn_status() -> dict:
-    wg_out, _, wg_rc = run_cmd('sudo wg show 2>/dev/null', timeout=5)
-    iface_out, _, _  = run_cmd('ip link show type tun 2>/dev/null')
-    nm_out, _, nm_rc = run_cmd(
-        "nmcli -t -f TYPE,STATE con show --active 2>/dev/null | grep -i vpn")
-    active_ifaces, _, _ = run_cmd('wg show interfaces 2>/dev/null')
+    active_wg, _, _ = run_cmd('wg show interfaces 2>/dev/null', timeout=4)
+    tun_out, _, _   = run_cmd('ip link show type tun 2>/dev/null', timeout=4)
+    nm_active, _, _ = run_cmd(
+        "nmcli -t -f NAME,TYPE,STATE con show --active 2>/dev/null | grep -i vpn | grep -i activated",
+        timeout=4)
     return {
-        'wireguard_active':  bool(active_ifaces.strip()),
-        'wireguard_ifaces':  active_ifaces.strip().split() if active_ifaces.strip() else [],
-        'wireguard_info':    wg_out.strip()[:400],
-        'tun_active':        bool(iface_out.strip()),
-        'nm_vpn_active':     bool(nm_out.strip()),
+        'wireguard_active':  bool(active_wg.strip()),
+        'wireguard_ifaces':  active_wg.strip().split() if active_wg.strip() else [],
+        'tun_active':        bool(tun_out.strip()),
+        'nm_vpn_active':     bool(nm_active.strip()),
+        'nm_vpn_name':       nm_active.split(':')[0].strip() if nm_active.strip() else '',
     }
 
 
+NONE_LABEL = '(none found — see instructions below)'
+
+
 class VPNScreen(ctk.CTkFrame):
-    def _safe_after(self, delay, fn, *args):
-        """Thread-safe after() that guards against destroyed widgets."""
-        def _guarded():
-            try:
-                if self.winfo_exists():
-                    fn(*args)
-            except Exception:
-                pass
-        try:
-            self.after(delay, _guarded)
-        except Exception:
-            pass
-
-
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=C['bg'], corner_radius=0)
-        self.app    = app
-        self._built = False
+        self.app      = app
+        self._built   = False
         self._ov_proc = None
 
     def on_focus(self):
         if not self._built:
             self._build()
             self._built = True
-        self._refresh()
+        threading.Thread(target=self._bg_refresh, daemon=True).start()
 
     def on_blur(self):
-        """Called when switching away from this tab — stop background work."""
         pass
 
+    def _safe_after(self, delay, fn, *args):
+        def _g():
+            try:
+                if self.winfo_exists(): fn(*args)
+            except Exception: pass
+        try: self.after(delay, _g)
+        except Exception: pass
 
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
-        hdr.pack(fill='x')
-        hdr.pack_propagate(False)
+        hdr.pack(fill='x'); hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text='🔒  VPN CLIENT',
-                     font=('Courier', 13, 'bold'),
-                     text_color=C['ac']).pack(side='left', padx=16)
-        Btn(hdr, '↺ REFRESH', command=self._refresh,
+                     font=('Courier', 13, 'bold'), text_color=C['ac']
+                     ).pack(side='left', padx=16)
+        Btn(hdr, '↺ REFRESH', command=lambda: threading.Thread(
+            target=self._bg_refresh, daemon=True).start(),
             variant='ghost', width=90).pack(side='right', padx=8, pady=8)
 
         body = ScrollableFrame(self)
         body.pack(fill='both', expand=True)
 
-        # ── STATUS ────────────────────────────────────────────────
-        SectionHeader(body, '01', 'VPN STATUS').pack(
-            fill='x', padx=14, pady=(14, 4))
+        # ── STATUS ─────────────────────────────────────────────
+        SectionHeader(body, '01', 'VPN STATUS').pack(fill='x', padx=14, pady=(14,4))
         self._sc = Card(body)
-        self._sc.pack(fill='x', padx=14, pady=(0, 8))
-        self._stat_lbl = ctk.CTkLabel(
-            self._sc, text='Checking...',
-            font=('Courier', 13, 'bold'), text_color=C['mu'])
-        self._stat_lbl.pack(pady=(12, 4))
-        self._stat_grid = ctk.CTkFrame(self._sc, fg_color='transparent')
-        self._stat_grid.pack(fill='x', padx=8, pady=(0, 10))
+        self._sc.pack(fill='x', padx=14, pady=(0,8))
+        self._stat_lbl = ctk.CTkLabel(self._sc, text='Checking...',
+                                       font=('Courier',13,'bold'), text_color=C['mu'])
+        self._stat_lbl.pack(pady=(12,4))
+        self._stat_info = ctk.CTkLabel(self._sc, text='',
+                                        font=MONO_SM, text_color=C['mu'])
+        self._stat_info.pack(pady=(0,4))
+        self._tool_lbl = ctk.CTkLabel(self._sc, text='',
+                                       font=('Courier',8), text_color=C['mu'])
+        self._tool_lbl.pack(pady=(0,10))
 
-        # ── WIREGUARD — ONE-BUTTON ────────────────────────────────
-        SectionHeader(body, '02', 'WIREGUARD — ONE-BUTTON CONNECT').pack(
-            fill='x', padx=14, pady=(8, 4))
-        wg_card = Card(body, accent=C['ac'])
-        wg_card.pack(fill='x', padx=14, pady=(0, 8))
-
-        ctk.CTkLabel(wg_card,
-            text='Auto-detected WireGuard configs:',
-            font=MONO_SM, text_color=C['mu']).pack(anchor='w', padx=12, pady=(10,2))
-
-        # Config selector dropdown (auto-populated)
-        self._wg_var = ctk.StringVar(value='')
+        # ── WIREGUARD ──────────────────────────────────────────
+        SectionHeader(body, '02', 'WIREGUARD').pack(fill='x', padx=14, pady=(8,4))
+        wg = Card(body, accent=C['ac'])
+        wg.pack(fill='x', padx=14, pady=(0,8))
+        ctk.CTkLabel(wg, text='Select config:', font=MONO_SM,
+                     text_color=C['mu']).pack(anchor='w', padx=12, pady=(10,2))
+        self._wg_var  = ctk.StringVar(value=NONE_LABEL)
         self._wg_menu = ctk.CTkOptionMenu(
-            wg_card, variable=self._wg_var,
-            values=['(scanning...)'],
+            wg, variable=self._wg_var, values=[NONE_LABEL],
             fg_color=C['s2'], button_color=C['br2'],
-            dropdown_fg_color=C['sf'],
-            text_color=C['tx'], font=('Courier', 9))
+            dropdown_fg_color=C['sf'], text_color=C['tx'], font=('Courier',9),
+            dynamic_resizing=False)
         self._wg_menu.pack(fill='x', padx=12, pady=4)
 
-        br = ctk.CTkFrame(wg_card, fg_color='transparent')
-        br.pack(fill='x', padx=12, pady=(0, 10))
-        Btn(br, '▶ WG UP',       command=self._wg_up,     width=110).pack(side='left', padx=(0,6))
-        Btn(br, '⏹ WG DOWN',     command=self._wg_down,   variant='danger', width=110).pack(side='left', padx=(0,6))
-        Btn(br, '📊 WG STATUS',  command=self._wg_status, variant='ghost',  width=120).pack(side='left')
+        br = ctk.CTkFrame(wg, fg_color='transparent')
+        br.pack(fill='x', padx=12, pady=(4,6))
+        Btn(br, '▶ WG UP',      command=self._wg_up,     width=110).pack(side='left', padx=(0,6))
+        Btn(br, '⏹ WG DOWN',    command=self._wg_down,   variant='danger', width=110).pack(side='left', padx=(0,6))
+        Btn(br, '📊 STATUS',    command=self._wg_status, variant='ghost',  width=100).pack(side='left')
 
-        ctk.CTkLabel(wg_card,
-            text='No configs? Place .conf file in /etc/wireguard/ or ~/vpn/',
-            font=('Courier', 8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,8))
+        self._wg_install_frame = ctk.CTkFrame(wg, fg_color='transparent')
+        self._wg_install_frame.pack(fill='x', padx=12, pady=(0,4))
 
-        # ── OPENVPN ───────────────────────────────────────────────
-        SectionHeader(body, '03', 'OPENVPN').pack(
-            fill='x', padx=14, pady=(8, 4))
-        ov_card = Card(body, accent=C['bl'])
-        ov_card.pack(fill='x', padx=14, pady=(0, 8))
+        ctk.CTkLabel(wg,
+            text='No .conf? Place WireGuard .conf file in:\n'
+                 '  /etc/wireguard/wg0.conf   OR   ~/vpn/myvpn.conf',
+            font=('Courier',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,10))
 
-        ctk.CTkLabel(ov_card,
-            text='Auto-detected .ovpn configs:',
-            font=MONO_SM, text_color=C['mu']).pack(anchor='w', padx=12, pady=(10,2))
-
-        self._ov_var = ctk.StringVar(value='')
+        # ── OPENVPN ────────────────────────────────────────────
+        SectionHeader(body, '03', 'OPENVPN').pack(fill='x', padx=14, pady=(8,4))
+        ov = Card(body, accent=C['bl'])
+        ov.pack(fill='x', padx=14, pady=(0,8))
+        ctk.CTkLabel(ov, text='Select .ovpn config:', font=MONO_SM,
+                     text_color=C['mu']).pack(anchor='w', padx=12, pady=(10,2))
+        self._ov_var  = ctk.StringVar(value=NONE_LABEL)
         self._ov_menu = ctk.CTkOptionMenu(
-            ov_card, variable=self._ov_var,
-            values=['(scanning...)'],
+            ov, variable=self._ov_var, values=[NONE_LABEL],
             fg_color=C['s2'], button_color=C['br2'],
-            dropdown_fg_color=C['sf'],
-            text_color=C['tx'], font=('Courier', 9))
+            dropdown_fg_color=C['sf'], text_color=C['tx'], font=('Courier',9),
+            dynamic_resizing=False)
         self._ov_menu.pack(fill='x', padx=12, pady=4)
 
-        ovbr = ctk.CTkFrame(ov_card, fg_color='transparent')
-        ovbr.pack(fill='x', padx=12, pady=(0, 10))
-        Btn(ovbr, '▶ CONNECT',    command=self._ov_connect,    width=120).pack(side='left', padx=(0,6))
-        Btn(ovbr, '⏹ DISCONNECT', command=self._ov_disconnect, variant='danger', width=130).pack(side='left')
+        br2 = ctk.CTkFrame(ov, fg_color='transparent')
+        br2.pack(fill='x', padx=12, pady=(4,6))
+        Btn(br2, '▶ CONNECT',    command=self._ov_connect,    width=120).pack(side='left', padx=(0,6))
+        Btn(br2, '⏹ DISCONNECT', command=self._ov_disconnect, variant='danger', width=120).pack(side='left')
 
-        # ── INSTALL ───────────────────────────────────────────────
-        SectionHeader(body, '04', 'INSTALL VPN TOOLS').pack(
-            fill='x', padx=14, pady=(8, 4))
-        ic = Card(body)
-        ic.pack(fill='x', padx=14, pady=(0, 8))
-        self._tools_frame = ctk.CTkFrame(ic, fg_color='transparent')
-        self._tools_frame.pack(fill='x', padx=12, pady=6)
-        ibr = ctk.CTkFrame(ic, fg_color='transparent')
-        ibr.pack(fill='x', padx=12, pady=(0,10))
-        Btn(ibr, '⬇ INSTALL WIREGUARD',
-            command=lambda: self._install('wireguard wireguard-tools'),
-            width=190).pack(side='left', padx=(0,8))
-        Btn(ibr, '⬇ INSTALL OPENVPN',
-            command=lambda: self._install('openvpn'),
-            variant='blue', width=160).pack(side='left')
+        self._ov_install_frame = ctk.CTkFrame(ov, fg_color='transparent')
+        self._ov_install_frame.pack(fill='x', padx=12, pady=(0,4))
 
-        # ── LOG ───────────────────────────────────────────────────
-        SectionHeader(body, '05', 'VPN LOG').pack(
-            fill='x', padx=14, pady=(8, 4))
+        ctk.CTkLabel(ov,
+            text='No .ovpn? Download from your VPN provider and place in ~/vpn/',
+            font=('Courier',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,10))
+
+        # ── NETWORKMANAGER VPN ─────────────────────────────────
+        SectionHeader(body, '04', 'NETWORKMANAGER VPN').pack(fill='x', padx=14, pady=(8,4))
+        nm = Card(body)
+        nm.pack(fill='x', padx=14, pady=(0,8))
+        ctk.CTkLabel(nm, text='nmcli configured VPN connections:',
+                     font=MONO_SM, text_color=C['mu']).pack(anchor='w', padx=12, pady=(10,2))
+        self._nm_var  = ctk.StringVar(value=NONE_LABEL)
+        self._nm_menu = ctk.CTkOptionMenu(
+            nm, variable=self._nm_var, values=[NONE_LABEL],
+            fg_color=C['s2'], button_color=C['br2'],
+            dropdown_fg_color=C['sf'], text_color=C['tx'], font=('Courier',9),
+            dynamic_resizing=False)
+        self._nm_menu.pack(fill='x', padx=12, pady=4)
+        br3 = ctk.CTkFrame(nm, fg_color='transparent')
+        br3.pack(fill='x', padx=12, pady=(4,10))
+        Btn(br3, '▶ NM CONNECT',    command=self._nm_connect,    width=150).pack(side='left', padx=(0,6))
+        Btn(br3, '⏹ NM DISCONNECT', command=self._nm_disconnect, variant='danger', width=150).pack(side='left')
+
+        # ── LOG ────────────────────────────────────────────────
+        SectionHeader(body, '05', 'VPN LOG').pack(fill='x', padx=14, pady=(8,4))
         lc = Card(body)
-        lc.pack(fill='x', padx=14, pady=(0, 14))
-        self._log_box = ctk.CTkTextbox(
-            lc, height=130, font=('Courier', 9),
-            fg_color=C['bg'], text_color=C['ok'], border_width=0)
+        lc.pack(fill='x', padx=14, pady=(0,14))
+        self._log_box = ctk.CTkTextbox(lc, height=130, font=('Courier',9),
+                                        fg_color=C['bg'], text_color=C['ok'], border_width=0)
         self._log_box.pack(fill='x', padx=8, pady=8)
         self._log_box.configure(state='normal')
 
     def _ulog(self, msg):
-        def _do():
-            try:
-                if not self.winfo_exists(): return
-                self._log_box.configure(state='normal')
-                ts = time.strftime('%H:%M:%S')
-                self._log_box.insert('end', f'[{ts}] {msg}\n')
-                self._log_box.see('end')
-                self._log_box.configure(state='disabled')
-            except Exception:
-                pass
-        self._safe_after(0, _do)
+        try:
+            if not self.winfo_exists(): return
+            self._log_box.configure(state='normal')
+            self._log_box.insert('end', f'[{time.strftime("%H:%M:%S")}] {msg}\n')
+            self._log_box.see('end')
+            self._log_box.configure(state='disabled')
+        except Exception: pass
 
-    def _refresh(self):
-        # Scan configs
+    def _bg_refresh(self):
         wg_cfgs  = find_wg_configs()
         ov_cfgs  = find_ovpn_configs()
+        nm_conns = get_nmcli_vpn_connections()
         tools    = detect_vpn_tools()
         st       = get_vpn_status()
+        self._safe_after(0, self._apply_refresh, wg_cfgs, ov_cfgs, nm_conns, tools, st)
 
-        # Update WG dropdown
-        wg_names = wg_cfgs if wg_cfgs else ['(no .conf files found)']
-        self._wg_menu.configure(values=wg_names)
-        if wg_cfgs and (not self._wg_var.get() or self._wg_var.get() == '(scanning...)'):
+    def _apply_refresh(self, wg_cfgs, ov_cfgs, nm_conns, tools, st):
+        try:
+            if not self.winfo_exists(): return
+        except Exception: return
+
+        # WireGuard dropdown
+        wg_vals = wg_cfgs if wg_cfgs else [NONE_LABEL]
+        self._wg_menu.configure(values=wg_vals)
+        if wg_cfgs and self._wg_var.get() == NONE_LABEL:
             self._wg_var.set(wg_cfgs[0])
         elif not wg_cfgs:
-            self._wg_var.set(wg_names[0])
+            self._wg_var.set(NONE_LABEL)
 
-        # Update OV dropdown
-        ov_names = ov_cfgs if ov_cfgs else ['(no .ovpn files found)']
-        self._ov_menu.configure(values=ov_names)
-        if ov_cfgs and (not self._ov_var.get() or self._ov_var.get() == '(scanning...)'):
+        # OpenVPN dropdown
+        ov_vals = ov_cfgs if ov_cfgs else [NONE_LABEL]
+        self._ov_menu.configure(values=ov_vals)
+        if ov_cfgs and self._ov_var.get() == NONE_LABEL:
             self._ov_var.set(ov_cfgs[0])
         elif not ov_cfgs:
-            self._ov_var.set(ov_names[0])
+            self._ov_var.set(NONE_LABEL)
+
+        # NM VPN dropdown
+        nm_vals = nm_conns if nm_conns else [NONE_LABEL]
+        self._nm_menu.configure(values=nm_vals)
+        if nm_conns and self._nm_var.get() == NONE_LABEL:
+            self._nm_var.set(nm_conns[0])
+        elif not nm_conns:
+            self._nm_var.set(NONE_LABEL)
 
         # Status
         connected = st['wireguard_active'] or st['tun_active'] or st['nm_vpn_active']
+        if st['wireguard_active']:
+            detail = f"WireGuard: {', '.join(st['wireguard_ifaces'])}"
+        elif st['nm_vpn_active']:
+            detail = f"NM VPN: {st['nm_vpn_name']}"
+        elif st['tun_active']:
+            detail = "TUN interface active (OpenVPN)"
+        else:
+            detail = f"WG configs: {len(wg_cfgs)}  OVPN: {len(ov_cfgs)}  NM VPNs: {len(nm_conns)}"
+
         self._stat_lbl.configure(
-            text='🔒 VPN CONNECTED' if connected else '⚠ NOT CONNECTED',
+            text='🔒 CONNECTED' if connected else '⚠ NOT CONNECTED',
             text_color=C['ok'] if connected else C['wn'])
+        self._stat_info.configure(text=detail)
 
-        for w in self._stat_grid.winfo_children(): w.destroy()
-        items = [
-            ('WIREGUARD',
-             f"Active ({', '.join(st['wireguard_ifaces'])})" if st['wireguard_active'] else 'Inactive',
-             C['ok'] if st['wireguard_active'] else C['mu']),
-            ('TUN IFACE',  'Up' if st['tun_active'] else 'None',
-             C['ok'] if st['tun_active'] else C['mu']),
-            ('NM VPN',     'Active' if st['nm_vpn_active'] else 'None',
-             C['ok'] if st['nm_vpn_active'] else C['mu']),
-            ('WG CONFIGS', str(len(wg_cfgs)), C['ac']),
-            ('OV CONFIGS', str(len(ov_cfgs)), C['ac']),
-        ]
-        InfoGrid(self._stat_grid, items, columns=5).pack(fill='x')
-
-        # Tool status
-        for w in self._tools_frame.winfo_children(): w.destroy()
+        tool_parts = []
         for name, ok in tools.items():
-            ctk.CTkLabel(self._tools_frame,
-                text=f"{'✓' if ok else '✗'} {name}",
-                font=('Courier', 9, 'bold'),
-                text_color=C['ok'] if ok else C['wn']
-                ).pack(side='left', padx=10)
+            tool_parts.append(f"{'✓' if ok else '✗'} {name}")
+        self._tool_lbl.configure(text='  '.join(tool_parts))
+
+        # Show install buttons only if tool is missing
+        for w in self._wg_install_frame.winfo_children(): w.destroy()
+        if not tools['wg-quick']:
+            Btn(self._wg_install_frame, '⬇ INSTALL WIREGUARD',
+                command=lambda: self._install('wireguard wireguard-tools'), width=200
+                ).pack(side='left', padx=(0,6))
+
+        for w in self._ov_install_frame.winfo_children(): w.destroy()
+        if not tools['openvpn']:
+            Btn(self._ov_install_frame, '⬇ INSTALL OPENVPN',
+                command=lambda: self._install('openvpn'), width=180
+                ).pack(side='left')
 
     def _get_wg_iface(self):
-        conf = self._wg_var.get()
-        if '(no ' in conf or not conf:
+        val = self._wg_var.get()
+        if val == NONE_LABEL or not val:
             return None
-        return os.path.basename(conf).replace('.conf', '')
+        return os.path.basename(val).replace('.conf','')
 
     def _wg_up(self):
         iface = self._get_wg_iface()
         if not iface:
-            self._ulog('No WireGuard config selected or found.')
+            self._ulog('No WireGuard config selected. Place a .conf file in /etc/wireguard/ or ~/vpn/')
             return
+        conf = self._wg_var.get()
         self._ulog(f'Starting WireGuard: {iface}')
         def _bg():
-            out, err, rc = run_cmd(f'sudo wg-quick up {iface}', timeout=20)
-            self._safe_after(0, self._ulog, out or err or f'Done (rc={rc})')
-            self._safe_after(0, self._refresh)
+            # Copy to /etc/wireguard if needed
+            target = f'/etc/wireguard/{iface}.conf'
+            if not os.path.exists(target) and os.path.exists(conf):
+                run_cmd(f'sudo cp "{conf}" "{target}"', timeout=10)
+            out, err, rc = run_cmd(f'sudo wg-quick up {iface}', timeout=25)
+            msg = out or err or f'Exit code: {rc}'
+            self._safe_after(0, self._ulog, ('✓ ' if rc==0 else '✗ ') + msg[:120])
+            self._safe_after(500, threading.Thread(target=self._bg_refresh, daemon=True).start)
         threading.Thread(target=_bg, daemon=True).start()
 
     def _wg_down(self):
-        # Try active interfaces first, then selected config
         st = get_vpn_status()
-        ifaces = st.get('wireguard_ifaces', []) or ([self._get_wg_iface()] if self._get_wg_iface() else [])
+        ifaces = st['wireguard_ifaces'] or ([self._get_wg_iface()] if self._get_wg_iface() else [])
         if not ifaces:
-            self._ulog('No active WireGuard interface to stop.')
+            self._ulog('No active WireGuard interface.')
             return
         def _bg():
             for iface in ifaces:
-                out, err, rc = run_cmd(f'sudo wg-quick down {iface}', timeout=10)
-                self._safe_after(0, self._ulog, f'{iface}: ' + (out or err or f'Done rc={rc}'))
-            self._safe_after(0, self._refresh)
+                out, err, rc = run_cmd(f'sudo wg-quick down {iface}', timeout=15)
+                self._safe_after(0, self._ulog, f'{iface}: {out or err or "Done"}')
+            self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
         threading.Thread(target=_bg, daemon=True).start()
 
     def _wg_status(self):
         def _bg():
-            out, err, _ = run_cmd('sudo wg show')
+            out, err, _ = run_cmd('sudo wg show', timeout=8)
             self._safe_after(0, self._ulog, out or err or 'No active WireGuard tunnels')
         threading.Thread(target=_bg, daemon=True).start()
 
     def _ov_connect(self):
         conf = self._ov_var.get()
-        if '(no ' in conf or not conf:
-            self._ulog('No .ovpn config selected or found.')
+        if conf == NONE_LABEL or not conf:
+            self._ulog('No .ovpn file selected. Download from your VPN provider and place in ~/vpn/')
             return
         self._ulog(f'Connecting OpenVPN: {os.path.basename(conf)}')
         def _bg():
-            self._ov_proc = subprocess.Popen(
-                ['sudo', 'openvpn', '--config', conf, '--daemon',
-                 '--log', '/tmp/mint_scan_openvpn.log'],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            time.sleep(3)
-            self._safe_after(0, self._ulog, 'OpenVPN daemon started')
-            self._safe_after(0, self._refresh)
+            out, err, rc = run_cmd(
+                f'sudo openvpn --config "{conf}" --daemon '
+                f'--log /tmp/mint_scan_openvpn.log --writepid /tmp/mint_scan_ov.pid',
+                timeout=20)
+            time.sleep(2)
+            self._safe_after(0, self._ulog, '✓ OpenVPN daemon started' if rc==0 else f'✗ {out or err}')
+            self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
         threading.Thread(target=_bg, daemon=True).start()
 
     def _ov_disconnect(self):
@@ -329,11 +377,30 @@ class VPNScreen(ctk.CTkFrame):
             except Exception: pass
             self._ov_proc = None
         self._ulog('OpenVPN terminated')
-        self._refresh()
+        threading.Thread(target=self._bg_refresh, daemon=True).start()
+
+    def _nm_connect(self):
+        name = self._nm_var.get()
+        if name == NONE_LABEL or not name:
+            self._ulog('No NetworkManager VPN selected.')
+            return
+        self._ulog(f'Connecting NM VPN: {name}')
+        def _bg():
+            out, err, rc = run_cmd(f'nmcli con up "{name}"', timeout=30)
+            self._safe_after(0, self._ulog, out or err or f'Exit: {rc}')
+            self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _nm_disconnect(self):
+        name = self._nm_var.get()
+        if name == NONE_LABEL: return
+        run_cmd(f'nmcli con down "{name}"', timeout=15)
+        self._ulog(f'NM VPN disconnected: {name}')
+        threading.Thread(target=self._bg_refresh, daemon=True).start()
 
     def _install(self, pkg):
         from installer import InstallerPopup
         InstallerPopup(self, f'Install {pkg}',
                        [f'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y {pkg}'],
                        f'{pkg} installed!')
-        self.after(3000, self._refresh)
+        self.after(4000, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())

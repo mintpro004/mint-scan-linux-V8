@@ -34,8 +34,14 @@ class TerminalScreen(ctk.CTkFrame):
         if not self._built:
             self._build()
             self._built = True
-        if not self._running:
+        # Only start shell if it's not already running
+        if not self._running or self._proc is None:
             self._start_shell()
+        # Focus input
+        try:
+            self._input.focus_set()
+        except Exception:
+            pass
 
     def on_blur(self):
         pass  # keep shell alive when switching tabs
@@ -213,14 +219,16 @@ class TerminalScreen(ctk.CTkFrame):
 
     def _print(self, text: str):
         try:
-            if not self.winfo_exists(): return
+            if not self.winfo_exists():
+                return
+            if not hasattr(self, '_output'):
+                return
             self._output.configure(state='normal')
             self._output.insert('end', text)
             self._output.see('end')
-            # Trim to last 5000 lines to avoid memory bloat
             line_count = int(self._output.index('end').split('.')[0])
-            if line_count > 5000:
-                self._output.delete('1.0', f'{line_count - 4000}.0')
+            if line_count > 3000:
+                self._output.delete('1.0', f'{line_count - 2000}.0')
         except Exception:
             pass
 
@@ -278,20 +286,22 @@ class TerminalScreen(ctk.CTkFrame):
         return 'break'
 
     def _tab_complete(self, event):
-        """Basic tab completion using bash."""
-        partial = self._input.get()
+        """Tab completion using bash compgen."""
+        partial = self._input.get().strip()
         if not partial:
             return 'break'
         try:
-            r = subprocess.run(
-                f'bash -c "compgen -f {partial} 2>/dev/null | head -5"',
-                shell=True, capture_output=True, text=True, timeout=2)
-            matches = r.stdout.strip().splitlines()
+            import subprocess as _sp
+            r = _sp.run(
+                ['bash', '-c', f'compgen -f -- {partial} 2>/dev/null | head -8'],
+                capture_output=True, text=True, timeout=2)
+            matches = [m.strip() for m in r.stdout.splitlines() if m.strip()]
         except Exception:
             matches = []
         if len(matches) == 1:
             self._input.delete(0, 'end')
             self._input.insert(0, matches[0] + ' ')
-        elif matches:
-            self._print('\t'.join(matches[:5]) + '\n')
+        elif len(matches) > 1:
+            self._print('  '.join(matches[:8]) + '\n')
         return 'break'
+
