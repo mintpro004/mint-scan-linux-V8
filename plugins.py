@@ -129,7 +129,7 @@ class PluginScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text='🔌  PLUGIN MANAGER',
-                     font=('DejaVu Sans Mono', 13, 'bold'),
+                     font=('Courier', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         Btn(hdr, '↺ RELOAD', command=self._refresh,
             variant='ghost', width=90).pack(side='right', padx=8, pady=6)
@@ -146,12 +146,12 @@ class PluginScreen(ctk.CTkFrame):
         dc = Card(body)
         dc.pack(fill='x', padx=14, pady=(0, 8))
         ctk.CTkLabel(dc, text=PLUGIN_DIR,
-                     font=('DejaVu Sans Mono', 9), text_color=C['ac']
+                     font=('Courier', 9), text_color=C['ac']
                      ).pack(anchor='w', padx=12, pady=8)
         ctk.CTkLabel(dc,
             text='Drop .py plugin files here. Each plugin can add a sidebar tab\n'
                  'or react to security events (threats, scans, port opens).',
-            font=('DejaVu Sans Mono', 9), text_color=C['mu'], justify='left'
+            font=('Courier', 9), text_color=C['mu'], justify='left'
             ).pack(anchor='w', padx=12, pady=(0, 10))
 
         SectionHeader(body, '02', 'INSTALLED PLUGINS').pack(
@@ -181,15 +181,15 @@ class PluginScreen(ctk.CTkFrame):
             lc.pack(fill='x', padx=10, pady=8)
             ctk.CTkLabel(lc,
                 text=f"{'✓' if not err else '✗'}  {m.get('name','?')}  v{m.get('version','?')}",
-                font=('DejaVu Sans Mono', 10, 'bold'),
+                font=('Courier', 10, 'bold'),
                 text_color=C['ok'] if not err else C['wn']
                 ).pack(side='left')
             ctk.CTkLabel(lc,
                 text=f"  by {m.get('author','?')}",
-                font=('DejaVu Sans Mono', 8), text_color=C['mu']
+                font=('Courier', 8), text_color=C['mu']
                 ).pack(side='left')
             ctk.CTkLabel(row,
                 text=m.get('description', err or ''),
-                font=('DejaVu Sans Mono', 9), text_color=C['mu']
+                font=('Courier', 9), text_color=C['mu']
                 ).pack(anchor='w', padx=10, pady=(0, 8))
 

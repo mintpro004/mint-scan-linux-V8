@@ -65,7 +65,7 @@ class InvestigateScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text="🔬  THREAT INVESTIGATOR",
-                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['ac']
+                     font=('Courier',13,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         self.stop_btn = Btn(hdr, "⏹ STOP", command=self._stop,
                             variant='danger', width=80)
@@ -90,7 +90,7 @@ class InvestigateScreen(ctk.CTkFrame):
         row.pack(fill='x', padx=12, pady=(0,10))
         self.target_entry = ctk.CTkEntry(row,
             placeholder_text="e.g.  185.220.101.5  or  evil.ru  or  nc  or  :4444",
-            font=('DejaVu Sans Mono',11), fg_color=C['bg'],
+            font=('Courier',11), fg_color=C['bg'],
             border_color=C['ac'], text_color=C['ac'], height=40)
         self.target_entry.pack(side='left', fill='x', expand=True, padx=(0,8))
         self.target_entry.bind('<Return>', lambda e: self._start_investigation())
@@ -99,7 +99,7 @@ class InvestigateScreen(ctk.CTkFrame):
 
         # Quick targets from live system
         ctk.CTkLabel(inp_card, text="Quick targets from live system:",
-                     font=('DejaVu Sans Mono',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,4))
+                     font=('Courier',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,4))
         q_row = ctk.CTkFrame(inp_card, fg_color='transparent')
         q_row.pack(fill='x', padx=12, pady=(0,10))
         Btn(q_row, "PUBLIC IP",    command=self._investigate_public_ip,  variant='ghost', width=110).pack(side='left', padx=3)
@@ -140,7 +140,7 @@ class InvestigateScreen(ctk.CTkFrame):
         self.whois_card = Card(body)
         self.whois_card.pack(fill='x', padx=14, pady=(0,8))
         self.whois_box = ctk.CTkTextbox(
-            self.whois_card, height=140, font=('DejaVu Sans Mono',8),
+            self.whois_card, height=140, font=('Courier',8),
             fg_color=C['bg'], text_color=C['tx'], border_width=0)
         self.whois_box.pack(fill='x', padx=8, pady=8)
         self.whois_box.configure(state='disabled')
@@ -157,7 +157,7 @@ class InvestigateScreen(ctk.CTkFrame):
         log_card = Card(body)
         log_card.pack(fill='x', padx=14, pady=(0,14))
         self.inv_log = ctk.CTkTextbox(
-            log_card, height=200, font=('DejaVu Sans Mono',8),
+            log_card, height=200, font=('Courier',8),
             fg_color=C['bg'], text_color=C['ac'],
             border_width=0)
         self.inv_log.pack(fill='x', padx=8, pady=8)
@@ -683,7 +683,7 @@ class InvestigateScreen(ctk.CTkFrame):
                         self.geo_frame,
                         text=f"Reverse DNS: {net_data.get('rdns','—')}  |  "
                              f"Reachable: {'Yes' if net_data.get('reachable') else 'No'}",
-                        font=('DejaVu Sans Mono',8), text_color=C['mu']
+                        font=('Courier',8), text_color=C['mu']
                     ).pack(anchor='w', pady=(4,0))
 
         # Network intel
@@ -693,10 +693,10 @@ class InvestigateScreen(ctk.CTkFrame):
             trace_card = Card(self.net_frame)
             trace_card.pack(fill='x', pady=(0,4))
             ctk.CTkLabel(trace_card, text="TRACEROUTE (last 5 hops):",
-                         font=('DejaVu Sans Mono',8,'bold'), text_color=C['ac']
+                         font=('Courier',8,'bold'), text_color=C['ac']
                          ).pack(anchor='w', padx=10, pady=(8,2))
             ctk.CTkLabel(trace_card, text=net_data['traceroute'],
-                         font=('DejaVu Sans Mono',8), text_color=C['mu'],
+                         font=('Courier',8), text_color=C['mu'],
                          justify='left', wraplength=700
                          ).pack(anchor='w', padx=10, pady=(0,8))
 
@@ -727,11 +727,11 @@ class InvestigateScreen(ctk.CTkFrame):
                 rec_card = Card(self.analysis_frame, accent=C['bl'])
                 rec_card.pack(fill='x', pady=(6,3))
                 ctk.CTkLabel(rec_card, text="RECOMMENDED ACTIONS:",
-                             font=('DejaVu Sans Mono',9,'bold'), text_color=C['bl']
+                             font=('Courier',9,'bold'), text_color=C['bl']
                              ).pack(anchor='w', padx=10, pady=(8,4))
                 for i, rec in enumerate(item['items'], 1):
                     ctk.CTkLabel(rec_card, text=f"{i}. {rec}",
-                                 font=('DejaVu Sans Mono',8), text_color=C['tx'],
+                                 font=('Courier',8), text_color=C['tx'],
                                  justify='left', wraplength=680
                                  ).pack(anchor='w', padx=14, pady=2)
                 ctk.CTkLabel(rec_card, text="", height=6).pack()

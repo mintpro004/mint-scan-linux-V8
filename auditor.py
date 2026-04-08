@@ -26,7 +26,7 @@ class AuditorScreen(ctk.CTkFrame):
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="🕵  SYSTEM AUDITOR", font=('DejaVu Sans Mono',13,'bold'),
+        ctk.CTkLabel(hdr, text="🕵  SYSTEM AUDITOR", font=('Courier',13,'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
 
         self.scroll = ScrollableFrame(self)
@@ -38,7 +38,7 @@ class AuditorScreen(ctk.CTkFrame):
         audit_card = Card(body)
         audit_card.pack(fill='x', padx=14, pady=(0,8))
         
-        self.audit_log = ctk.CTkTextbox(audit_card, height=120, font=('DejaVu Sans Mono',9),
+        self.audit_log = ctk.CTkTextbox(audit_card, height=120, font=('Courier',9),
                                          fg_color=C['bg'], text_color=C['tx'], border_width=0)
         self.audit_log.pack(fill='x', padx=8, pady=8)
         self.audit_log.insert('1.0', "Waiting for audit events...\n")

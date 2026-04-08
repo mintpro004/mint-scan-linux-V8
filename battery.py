@@ -41,7 +41,7 @@ class BatteryScreen(ctk.CTkFrame):
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="🔋  BATTERY", font=('DejaVu Sans Mono', 13, 'bold'),
+        ctk.CTkLabel(hdr, text="🔋  BATTERY", font=('Courier', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         Btn(hdr, "↺  REFRESH", command=lambda: threading.Thread(
             target=self._load, daemon=True).start(),
@@ -73,7 +73,7 @@ class BatteryScreen(ctk.CTkFrame):
         info_side = ctk.CTkFrame(hero, fg_color='transparent')
         info_side.pack(side='left', fill='both', expand=True, padx=16)
         self.pct_lbl = ctk.CTkLabel(info_side, text="—%",
-                                     font=('DejaVu Sans Mono', 48, 'bold'), text_color=C['ok'])
+                                     font=('Courier', 48, 'bold'), text_color=C['ok'])
         self.pct_lbl.pack(anchor='w')
         self.status_lbl = ctk.CTkLabel(info_side, text="Reading...",
                                         font=MONO_SM, text_color=C['mu'])
@@ -133,11 +133,11 @@ class BatteryScreen(ctk.CTkFrame):
         for ts, p in self._history[-15:]:
             row = ctk.CTkFrame(self.history_frame, fg_color='transparent')
             row.pack(fill='x', pady=1)
-            ctk.CTkLabel(row, text=ts, font=('DejaVu Sans Mono',8),
+            ctk.CTkLabel(row, text=ts, font=('Courier',8),
                          text_color=C['mu'], width=70).pack(side='left')
             c = C['ok'] if p>60 else C['am'] if p>20 else C['wn']
             bar = ctk.CTkProgressBar(row, height=6, progress_color=c, fg_color=C['br'])
             bar.pack(side='left', fill='x', expand=True, padx=6)
             bar.set(p/100)
-            ctk.CTkLabel(row, text=f"{p}%", font=('DejaVu Sans Mono',8),
+            ctk.CTkLabel(row, text=f"{p}%", font=('Courier',8),
                          text_color=c, width=36).pack(side='left')

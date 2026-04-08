@@ -174,7 +174,7 @@ class MarketplaceScreen(ctk.CTkFrame):
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text='🛍  PLUGIN MARKETPLACE',
-                     font=('DejaVu Sans Mono', 13, 'bold'),
+                     font=('Courier', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         Btn(hdr, '↺ REFRESH', command=lambda: threading.Thread(
             target=self._load_catalogue, daemon=True).start(),
@@ -199,7 +199,7 @@ class MarketplaceScreen(ctk.CTkFrame):
         ctk.CTkEntry(
             sr, textvariable=self._search_var,
             placeholder_text='Search plugins...',
-            font=('DejaVu Sans Mono', 10), fg_color=C['bg'],
+            font=('Courier', 10), fg_color=C['bg'],
             border_color=C['br'], text_color=C['tx'], height=34
             ).pack(side='left', fill='x', expand=True, padx=(0, 8))
         Btn(sr, '⬆ INSTALL .PY',
@@ -245,7 +245,7 @@ class MarketplaceScreen(ctk.CTkFrame):
             lr.pack(fill='x', padx=10, pady=8)
             ctk.CTkLabel(lr,
                 text=f"{'✓' if not err else '✗'}  {m.get('name','?')}  v{m.get('version','?')}",
-                font=('DejaVu Sans Mono', 10, 'bold'),
+                font=('Courier', 10, 'bold'),
                 text_color=C['ok'] if not err else C['wn']
                 ).pack(side='left')
             plugin_id = fn[:-3]
@@ -254,7 +254,7 @@ class MarketplaceScreen(ctk.CTkFrame):
                 variant='ghost', width=90, height=28).pack(side='right')
             ctk.CTkLabel(row,
                 text=m.get('description', err or '(no description)'),
-                font=('DejaVu Sans Mono', 9), text_color=C['mu']
+                font=('Courier', 9), text_color=C['mu']
                 ).pack(anchor='w', padx=10, pady=(0, 6))
 
     def _load_catalogue(self):
@@ -298,16 +298,16 @@ class MarketplaceScreen(ctk.CTkFrame):
                 name_txt += '  ★'
             ctk.CTkLabel(hr,
                 text=name_txt,
-                font=('DejaVu Sans Mono', 11, 'bold'), text_color=C['ac']
+                font=('Courier', 11, 'bold'), text_color=C['ac']
                 ).pack(side='left')
             ctk.CTkLabel(hr,
                 text=f"v{p['version']}  by {p['author']}",
-                font=('DejaVu Sans Mono', 8), text_color=C['mu']
+                font=('Courier', 8), text_color=C['mu']
                 ).pack(side='left', padx=8)
             if installed:
                 ctk.CTkLabel(hr,
                     text='✓ Installed',
-                    font=('DejaVu Sans Mono', 8, 'bold'), text_color=C['ok']
+                    font=('Courier', 8, 'bold'), text_color=C['ok']
                     ).pack(side='right')
             else:
                 Btn(hr, '⬇ INSTALL',
@@ -315,14 +315,14 @@ class MarketplaceScreen(ctk.CTkFrame):
                     width=90, height=28).pack(side='right')
             ctk.CTkLabel(card,
                 text=p['description'],
-                font=('DejaVu Sans Mono', 9), text_color=C['tx']
+                font=('Courier', 9), text_color=C['tx']
                 ).pack(anchor='w', padx=10, pady=(0,4))
             tag_row = ctk.CTkFrame(card, fg_color='transparent')
             tag_row.pack(anchor='w', padx=10, pady=(0,8))
             for tag in p.get('tags', []):
                 ctk.CTkLabel(tag_row,
                     text=f'#{tag}',
-                    font=('DejaVu Sans Mono', 8), text_color=C['bl']
+                    font=('Courier', 8), text_color=C['bl']
                     ).pack(side='left', padx=2)
 
     def _install_plugin(self, plug):

@@ -199,7 +199,7 @@ class WebMonitorScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text='🌐  WEB REMOTE MONITOR',
-                     font=('DejaVu Sans Mono', 13, 'bold'),
+                     font=('Courier', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
 
         body = ScrollableFrame(self)
@@ -211,10 +211,10 @@ class WebMonitorScreen(ctk.CTkFrame):
         self._sc.pack(fill='x', padx=14, pady=(0, 8))
         self._status_lbl = ctk.CTkLabel(
             self._sc, text='Server not running',
-            font=('DejaVu Sans Mono', 12, 'bold'), text_color=C['mu'])
+            font=('Courier', 12, 'bold'), text_color=C['mu'])
         self._status_lbl.pack(pady=(12, 4))
         self._url_lbl = ctk.CTkLabel(
-            self._sc, text='', font=('DejaVu Sans Mono', 14, 'bold'), text_color=C['ac'])
+            self._sc, text='', font=('Courier', 14, 'bold'), text_color=C['ac'])
         self._url_lbl.pack(pady=(0, 4))
         ctk.CTkLabel(self._sc,
             text='Open this URL on any device on the same network.',
@@ -251,9 +251,9 @@ class WebMonitorScreen(ctk.CTkFrame):
         ]:
             r = ctk.CTkFrame(ic, fg_color='transparent')
             r.pack(fill='x', padx=12, pady=2)
-            ctk.CTkLabel(r, text=ep, font=('DejaVu Sans Mono', 9, 'bold'),
+            ctk.CTkLabel(r, text=ep, font=('Courier', 9, 'bold'),
                          text_color=C['ac'], width=160).pack(side='left')
-            ctk.CTkLabel(r, text=desc, font=('DejaVu Sans Mono', 9),
+            ctk.CTkLabel(r, text=desc, font=('Courier', 9),
                          text_color=C['mu']).pack(side='left')
 
     def _refresh_status(self):

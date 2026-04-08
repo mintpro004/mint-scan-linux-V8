@@ -146,7 +146,7 @@ class DaemonScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text='⚙  DAEMON / SERVICE MODE',
-                     font=('DejaVu Sans Mono', 13, 'bold'),
+                     font=('Courier', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         Btn(hdr, '↺ REFRESH', command=self._refresh_status,
             variant='ghost', width=90).pack(side='right', padx=8, pady=6)
@@ -160,7 +160,7 @@ class DaemonScreen(ctk.CTkFrame):
         self._status_card.pack(fill='x', padx=14, pady=(0, 8))
         self._status_lbl = ctk.CTkLabel(
             self._status_card, text='Checking...',
-            font=('DejaVu Sans Mono', 12, 'bold'), text_color=C['mu'])
+            font=('Courier', 12, 'bold'), text_color=C['mu'])
         self._status_lbl.pack(pady=(12, 4))
         self._status_grid = ctk.CTkFrame(self._status_card, fg_color='transparent')
         self._status_grid.pack(fill='x', padx=8, pady=(0, 10))
@@ -184,7 +184,7 @@ class DaemonScreen(ctk.CTkFrame):
         python = os.path.join(BASE_DIR, 'venv', 'bin', 'python3')
         ctk.CTkLabel(fc,
             text=UNIT_CONTENT.format(user=user, base=BASE_DIR, python=python),
-            font=('DejaVu Sans Mono', 8), text_color=C['mu'], justify='left'
+            font=('Courier', 8), text_color=C['mu'], justify='left'
             ).pack(anchor='w', padx=12, pady=10)
 
         self._msg_lbl = ctk.CTkLabel(body, text='',

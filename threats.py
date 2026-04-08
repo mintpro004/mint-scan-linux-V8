@@ -55,7 +55,7 @@ class ThreatsScreen(ctk.CTkFrame):
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text="⚠  THREATS & REMEDIATION",
-                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['ac']
+                     font=('Courier',13,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         self.stop_btn = Btn(hdr, "⏹ STOP", command=self._stop,
                             variant='danger', width=90)
@@ -80,7 +80,7 @@ class ThreatsScreen(ctk.CTkFrame):
         qa = ctk.CTkFrame(body, fg_color=C['sf'], corner_radius=10)
         qa.pack(fill='x', padx=14, pady=(12,4))
         ctk.CTkLabel(qa, text="QUICK ACTIONS",
-                     font=('DejaVu Sans Mono',8,'bold'), text_color=C['mu']
+                     font=('Courier',8,'bold'), text_color=C['mu']
                      ).pack(anchor='w', padx=12, pady=(8,4))
         qg = ctk.CTkFrame(qa, fg_color='transparent')
         qg.pack(fill='x', padx=8, pady=(0,8))
@@ -100,7 +100,7 @@ class ThreatsScreen(ctk.CTkFrame):
 
         # ── Scan log ─────────────────────────────────────────
         SectionHeader(body,'01','SCAN LOG').pack(fill='x', padx=14, pady=(10,4))
-        self.scan_log = ctk.CTkTextbox(body, height=80, font=('DejaVu Sans Mono',8),
+        self.scan_log = ctk.CTkTextbox(body, height=80, font=('Courier',8),
                                         fg_color=C['s2'], text_color=C['ac'],
                                         border_color=C['br'], border_width=1,
                                         corner_radius=6)
@@ -117,7 +117,7 @@ class ThreatsScreen(ctk.CTkFrame):
 
         # ── Action output ─────────────────────────────────────
         SectionHeader(body,'03','ACTION OUTPUT').pack(fill='x', padx=14, pady=(8,4))
-        self.action_log = ctk.CTkTextbox(body, height=100, font=('DejaVu Sans Mono',8),
+        self.action_log = ctk.CTkTextbox(body, height=100, font=('Courier',8),
                                           fg_color=C['s2'], text_color=C['ok'],
                                           border_color=C['br'], border_width=1,
                                           corner_radius=6)
@@ -357,17 +357,17 @@ class ThreatsScreen(ctk.CTkFrame):
             badge = ctk.CTkFrame(top, fg_color=col, corner_radius=3)
             badge.pack(side='left', padx=(0,8))
             ctk.CTkLabel(badge, text=level,
-                         font=('DejaVu Sans Mono',7,'bold'),
+                         font=('Courier',7,'bold'),
                          text_color=C['bg']).pack(padx=7, pady=3)
             ctk.CTkLabel(top, text=title,
-                         font=('DejaVu Sans Mono',10,'bold'),
+                         font=('Courier',10,'bold'),
                          text_color=col, wraplength=520,
                          justify='left').pack(side='left')
 
             # Description
             if desc:
                 ctk.CTkLabel(card, text=desc,
-                             font=('DejaVu Sans Mono',8), text_color=C['mu'],
+                             font=('Courier',8), text_color=C['mu'],
                              wraplength=580, justify='left'
                              ).pack(anchor='w', padx=12, pady=(0,6))
 

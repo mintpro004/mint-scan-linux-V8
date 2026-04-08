@@ -44,7 +44,7 @@ class InstallerPopup(ctk.CTkToplevel):
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
         self._title_lbl = ctk.CTkLabel(hdr, text="⟳ Preparing...",
-                                        font=('DejaVu Sans Mono', 11, 'bold'),
+                                        font=('Courier', 11, 'bold'),
                                         text_color=C['ac'])
         self._title_lbl.pack(side='left', padx=14)
 
@@ -57,7 +57,7 @@ class InstallerPopup(ctk.CTkToplevel):
         self._prog.configure(mode='indeterminate')
 
         # Log area
-        self._log = ctk.CTkTextbox(self, font=('DejaVu Sans Mono', 10),
+        self._log = ctk.CTkTextbox(self, font=('Courier', 10),
                                     fg_color=C['s2'],
                                     text_color=C['ok'],
                                     border_color=C['br'], border_width=1,

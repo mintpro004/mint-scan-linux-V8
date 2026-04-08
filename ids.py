@@ -133,7 +133,7 @@ class IDSScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x'); hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text='🚨  IDS/IPS — SNORT & SURICATA',
-                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['wn']
+                     font=('Courier',13,'bold'), text_color=C['wn']
                      ).pack(side='left', padx=16)
         Btn(hdr, '↺ REFRESH', command=lambda: threading.Thread(
             target=self._bg_refresh, daemon=True).start(),
@@ -161,7 +161,7 @@ class IDSScreen(ctk.CTkFrame):
                                           fg_color=C['bg'], border_color=C['br'],
                                           text_color=C['tx'])
         self._iface_entry.pack(side='left', padx=8)
-        self._iface_detected = ctk.CTkLabel(ir, text='', font=('DejaVu Sans Mono',8),
+        self._iface_detected = ctk.CTkLabel(ir, text='', font=('Courier',8),
                                              text_color=C['mu'])
         self._iface_detected.pack(side='left')
 
@@ -186,10 +186,10 @@ class IDSScreen(ctk.CTkFrame):
         ah = ctk.CTkFrame(ac, fg_color='transparent')
         ah.pack(fill='x', padx=8, pady=(6,0))
         self._alert_count = ctk.CTkLabel(ah, text='No alerts',
-                                          font=('DejaVu Sans Mono',9,'bold'), text_color=C['mu'])
+                                          font=('Courier',9,'bold'), text_color=C['mu'])
         self._alert_count.pack(side='left')
         Btn(ah, '🗑 CLEAR', command=self._clear_alerts, variant='ghost', width=70).pack(side='right')
-        self._alert_log = ctk.CTkTextbox(ac, height=200, font=('DejaVu Sans Mono',9),
+        self._alert_log = ctk.CTkTextbox(ac, height=200, font=('Courier',9),
                                           fg_color=C['bg'], text_color=C['ok'],
                                           border_width=0, wrap='none')
         self._alert_log.pack(fill='x', padx=8, pady=8)
@@ -203,7 +203,7 @@ class IDSScreen(ctk.CTkFrame):
                      font=MONO_SM, text_color=C['mu']).pack(anchor='w', padx=12, pady=(10,2))
         self._rule_entry = ctk.CTkEntry(rc_card,
             placeholder_text='alert tcp any any -> any 4444 (msg:"Metasploit"; sid:9001; rev:1;)',
-            font=('DejaVu Sans Mono',9), fg_color=C['bg'], border_color=C['br'], text_color=C['tx'])
+            font=('Courier',9), fg_color=C['bg'], border_color=C['br'], text_color=C['tx'])
         self._rule_entry.pack(fill='x', padx=12, pady=(0,4))
         Btn(rc_card, '▶ TEST RULE SYNTAX', command=self._test_rule, width=180).pack(pady=(0,10))
         self._rule_status = ctk.CTkLabel(rc_card, text='', font=MONO_SM, text_color=C['mu'])
@@ -244,7 +244,7 @@ class IDSScreen(ctk.CTkFrame):
         if ids['suricata']:
             ctk.CTkLabel(self._sur_content,
                 text=f"✓ Installed: {ids['suricata_path']}",
-                font=('DejaVu Sans Mono',9,'bold'), text_color=C['ok']
+                font=('Courier',9,'bold'), text_color=C['ok']
                 ).pack(anchor='w', pady=(0,6))
             br = ctk.CTkFrame(self._sur_content, fg_color='transparent')
             br.pack(fill='x')
@@ -267,7 +267,7 @@ class IDSScreen(ctk.CTkFrame):
         if ids['snort']:
             ctk.CTkLabel(self._snort_content,
                 text=f"✓ Installed: {ids['snort_path']}",
-                font=('DejaVu Sans Mono',9,'bold'), text_color=C['ok']
+                font=('Courier',9,'bold'), text_color=C['ok']
                 ).pack(anchor='w', pady=(0,6))
             br2 = ctk.CTkFrame(self._snort_content, fg_color='transparent')
             br2.pack(fill='x')

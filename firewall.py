@@ -43,7 +43,7 @@ class FirewallScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text="🔥  FIREWALL MANAGER",
-                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['ac']
+                     font=('Courier',13,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         Btn(hdr, "↺ REFRESH", command=lambda: threading.Thread(
             target=self._load_status, daemon=True).start(),
@@ -91,7 +91,7 @@ class FirewallScreen(ctk.CTkFrame):
         row1 = ctk.CTkFrame(rule_card, fg_color='transparent')
         row1.pack(fill='x', padx=12, pady=(10,4))
 
-        ctk.CTkLabel(row1, text="PORT / SERVICE:", font=('DejaVu Sans Mono',9,'bold'),
+        ctk.CTkLabel(row1, text="PORT / SERVICE:", font=('Courier',9,'bold'),
                      text_color=C['ac'], width=140).pack(side='left')
         self.port_entry = ctk.CTkEntry(row1,
             placeholder_text="e.g. 8080  or  22  or  3306",
@@ -99,7 +99,7 @@ class FirewallScreen(ctk.CTkFrame):
             text_color=C['tx'], height=34, width=180)
         self.port_entry.pack(side='left', padx=8)
 
-        ctk.CTkLabel(row1, text="PROTO:", font=('DejaVu Sans Mono',9),
+        ctk.CTkLabel(row1, text="PROTO:", font=('Courier',9),
                      text_color=C['mu']).pack(side='left', padx=4)
         self.proto_var = tk.StringVar(value='tcp')
         proto_menu = ctk.CTkOptionMenu(row1, variable=self.proto_var,
@@ -111,7 +111,7 @@ class FirewallScreen(ctk.CTkFrame):
         row2 = ctk.CTkFrame(rule_card, fg_color='transparent')
         row2.pack(fill='x', padx=12, pady=(4,4))
 
-        ctk.CTkLabel(row2, text="FROM IP (optional):", font=('DejaVu Sans Mono',9,'bold'),
+        ctk.CTkLabel(row2, text="FROM IP (optional):", font=('Courier',9,'bold'),
                      text_color=C['ac'], width=140).pack(side='left')
         self.ip_entry = ctk.CTkEntry(row2,
             placeholder_text="e.g. 192.168.1.0/24  (leave blank = any)",
@@ -138,7 +138,7 @@ class FirewallScreen(ctk.CTkFrame):
         ipt_card.pack(fill='x', padx=14, pady=(0,8))
         Btn(ipt_card, "VIEW IPTABLES", command=self._view_iptables,
             variant='ghost', width=150).pack(anchor='w', padx=12, pady=(8,4))
-        self.ipt_box = ctk.CTkTextbox(ipt_card, height=140, font=('DejaVu Sans Mono',10),
+        self.ipt_box = ctk.CTkTextbox(ipt_card, height=140, font=('Courier',10),
                                        fg_color=C['bg'], text_color=C['mu'],
                                        border_width=0)
         self.ipt_box.pack(fill='x', padx=8, pady=(0,8))
@@ -157,7 +157,7 @@ class FirewallScreen(ctk.CTkFrame):
 
         # ── Action output ─────────────────────────────────────
         SectionHeader(body, '07', 'ACTION OUTPUT').pack(fill='x', padx=14, pady=(8,4))
-        self.action_log = ctk.CTkTextbox(body, height=110, font=('DejaVu Sans Mono',10),
+        self.action_log = ctk.CTkTextbox(body, height=110, font=('Courier',10),
                                           fg_color=C['s2'], text_color=C['ok'],
                                           border_color=C['br'], border_width=1, corner_radius=6)
         self.action_log.pack(fill='x', padx=14, pady=(0,14))
@@ -320,7 +320,7 @@ class FirewallScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(self.rules_frame,
                      text=f"{len(rules)} rule(s) configured:",
-                     font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac']
+                     font=('Courier',9,'bold'), text_color=C['ac']
                      ).pack(anchor='w', pady=(0,4))
 
         for rule in rules:
@@ -340,10 +340,10 @@ class FirewallScreen(ctk.CTkFrame):
             num_badge = ctk.CTkFrame(row, fg_color=C['br2'], corner_radius=3, width=32, height=28)
             num_badge.pack(side='left', padx=8, pady=8)
             num_badge.pack_propagate(False)
-            ctk.CTkLabel(num_badge, text=rule['num'], font=('DejaVu Sans Mono',9,'bold'),
+            ctk.CTkLabel(num_badge, text=rule['num'], font=('Courier',9,'bold'),
                          text_color=C['ac']).pack(expand=True)
 
-            ctk.CTkLabel(row, text=rule['rule'], font=('DejaVu Sans Mono',9),
+            ctk.CTkLabel(row, text=rule['rule'], font=('Courier',9),
                          text_color=col, anchor='w', justify='left'
                          ).pack(side='left', padx=4, pady=8, fill='x', expand=True)
 

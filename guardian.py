@@ -52,7 +52,7 @@ class GuardianScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text='🛡  GUARDIAN AUTO-DEFENSE',
-                     font=('DejaVu Sans Mono', 13, 'bold'),
+                     font=('Courier', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
 
         body = ScrollableFrame(self)
@@ -67,7 +67,7 @@ class GuardianScreen(ctk.CTkFrame):
 
         self.status_lbl = ctk.CTkLabel(
             mode_card, text='STATUS: INACTIVE',
-            font=('DejaVu Sans Mono', 13, 'bold'), text_color=C['mu'])
+            font=('Courier', 13, 'bold'), text_color=C['mu'])
         self.status_lbl.pack(pady=(12, 4))
 
         ctk.CTkLabel(mode_card,
@@ -117,7 +117,7 @@ class GuardianScreen(ctk.CTkFrame):
         panic_card.pack(fill='x', padx=14, pady=(0, 8))
 
         ctk.CTkLabel(panic_card, text='⚠  PANIC BUTTON',
-                     font=('DejaVu Sans Mono', 14, 'bold'),
+                     font=('Courier', 14, 'bold'),
                      text_color=C['wn']).pack(pady=(12, 4))
         ctk.CTkLabel(panic_card,
             text='Instantly kills all network interfaces and locks screen.\n'
@@ -145,7 +145,7 @@ class GuardianScreen(ctk.CTkFrame):
         log_card = Card(body)
         log_card.pack(fill='x', padx=14, pady=(0, 14))
         self._glog = ctk.CTkTextbox(
-            log_card, height=140, font=('DejaVu Sans Mono', 9),
+            log_card, height=140, font=('Courier', 9),
             fg_color=C['bg'], text_color=C['ok'], border_width=0)
         self._glog.pack(fill='x', padx=8, pady=8)
         self._glog.configure(state='disabled')

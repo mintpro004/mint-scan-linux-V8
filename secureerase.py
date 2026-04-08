@@ -108,7 +108,7 @@ class SecureEraseScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text='🗑  SECURE ERASE',
-                     font=('DejaVu Sans Mono', 13, 'bold'),
+                     font=('Courier', 13, 'bold'),
                      text_color=C['wn']).pack(side='left', padx=16)
 
         body = ScrollableFrame(self)
@@ -133,7 +133,7 @@ class SecureEraseScreen(ctk.CTkFrame):
         sel_card.pack(fill='x', padx=14, pady=(0, 8))
         self._path_lbl = ctk.CTkLabel(sel_card,
             text='No file or folder selected.',
-            font=('DejaVu Sans Mono', 9), text_color=C['mu'])
+            font=('Courier', 9), text_color=C['mu'])
         self._path_lbl.pack(anchor='w', padx=12, pady=(12, 4))
         btn_row = ctk.CTkFrame(sel_card, fg_color='transparent')
         btn_row.pack(fill='x', padx=12, pady=(0, 10))
@@ -175,7 +175,7 @@ class SecureEraseScreen(ctk.CTkFrame):
         lc = Card(body)
         lc.pack(fill='x', padx=14, pady=(0, 14))
         self._log = ctk.CTkTextbox(
-            lc, height=140, font=('DejaVu Sans Mono', 9),
+            lc, height=140, font=('Courier', 9),
             fg_color=C['bg'], text_color=C['ok'], border_width=0)
         self._log.pack(fill='x', padx=8, pady=8)
         self._log.configure(state='disabled')
@@ -207,7 +207,7 @@ class SecureEraseScreen(ctk.CTkFrame):
         popup.configure(fg_color=C['bg'])
         popup.lift(); popup.focus_force()
         ctk.CTkLabel(popup, text='☢  CONFIRM IRREVERSIBLE ERASE',
-                     font=('DejaVu Sans Mono', 12, 'bold'),
+                     font=('Courier', 12, 'bold'),
                      text_color=C['wn']).pack(pady=(20, 8))
         ctk.CTkLabel(popup,
             text=f'Target:\n{self._selected}\n\nThis CANNOT be undone.',

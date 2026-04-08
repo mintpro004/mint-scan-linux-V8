@@ -51,10 +51,10 @@ class TerminalScreen(ctk.CTkFrame):
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text='> TERMINAL',
-                     font=('DejaVu Sans Mono', 13, 'bold'),
+                     font=('Courier', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         self._shell_lbl = ctk.CTkLabel(hdr, text='',
-                                        font=('DejaVu Sans Mono', 9), text_color=C['mu'])
+                                        font=('Courier', 9), text_color=C['mu'])
         self._shell_lbl.pack(side='left', padx=4)
 
         Btn(hdr, '🗑 CLEAR', command=self._clear,
@@ -65,27 +65,19 @@ class TerminalScreen(ctk.CTkFrame):
             variant='danger', width=70).pack(side='right', padx=4, pady=8)
 
         # Output area — large monospace textbox
-        out_frame = ctk.CTkFrame(self, fg_color='#010d18')
+        out_frame = ctk.CTkFrame(self, fg_color=C['bg'])
         out_frame.pack(fill='both', expand=True, padx=6, pady=(6,0))
 
         self._output = ctk.CTkTextbox(
             out_frame,
-            font=('DejaVu Sans Mono', 12),
-            fg_color='#010d18',   # deep terminal bg
-            text_color='#d8eeff',
+            font=('Courier', 10),
+            fg_color='#020a13',   # near-black terminal bg
+            text_color='#e8f4ff',
             border_color=C['br'],
             border_width=1,
             corner_radius=4,
             wrap='none')
         self._output.pack(fill='both', expand=True)
-        # Crisp rendering: disable smoothing artifacts
-        try:
-            self._output._textbox.configure(
-                font=('DejaVu Sans Mono', 12),
-                relief='flat', padx=6, pady=4,
-                spacing1=1, spacing2=0, spacing3=1)
-        except Exception:
-            pass
         self._output.configure(state='normal')
 
         # Input row
@@ -95,15 +87,15 @@ class TerminalScreen(ctk.CTkFrame):
 
         self._prompt_lbl = ctk.CTkLabel(
             inp_frame, text='$ ',
-            font=('DejaVu Sans Mono', 12, 'bold'), text_color=C['ok'])
+            font=('Courier', 11, 'bold'), text_color=C['ok'])
         self._prompt_lbl.pack(side='left', padx=(10,2), pady=8)
 
         self._input = ctk.CTkEntry(
             inp_frame,
-            font=('DejaVu Sans Mono', 12),
-            fg_color='#010d18',
+            font=('Courier', 11),
+            fg_color='#020a13',
             border_width=0,
-            text_color='#d8eeff',
+            text_color='#e8f4ff',
             placeholder_text='Type command and press Enter...',
             placeholder_text_color=C['mu'])
         self._input.pack(side='left', fill='both', expand=True, pady=6)
@@ -122,7 +114,7 @@ class TerminalScreen(ctk.CTkFrame):
         quick = ctk.CTkFrame(self, fg_color=C['s2'])
         quick.pack(fill='x', padx=6, pady=(0,4))
         ctk.CTkLabel(quick, text='Quick:',
-                     font=('DejaVu Sans Mono', 9), text_color=C['mu']
+                     font=('Courier', 8), text_color=C['mu']
                      ).pack(side='left', padx=8, pady=3)
         for cmd in ['ls -la', 'ps aux | head -20', 'netstat -tlnp',
                     'df -h', 'free -h', 'ufw status verbose',

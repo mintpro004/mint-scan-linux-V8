@@ -278,23 +278,23 @@ def prompt_save_report(parent, target: str, report_type: str,
     popup.attributes('-topmost', True)
 
     ctk.CTkLabel(popup, text="📋  EXPORT REPORT",
-                 font=('DejaVu Sans Mono', 14, 'bold'),
+                 font=('Courier', 14, 'bold'),
                  text_color=C['ac']).pack(pady=(20, 4))
     ctk.CTkLabel(popup,
                  text=f"Target: {target}   |   Type: {report_type}",
-                 font=('DejaVu Sans Mono', 9), text_color=C['tx']).pack(pady=2)
+                 font=('Courier', 9), text_color=C['tx']).pack(pady=2)
 
     fmt_var = ctk.StringVar(value=default_fmt)
     fmts = ctk.CTkFrame(popup, fg_color='transparent')
     fmts.pack(pady=10)
     for val, lbl in [('md', '📝 Markdown'), ('html', '🌐 HTML'), ('pdf', '📄 PDF')]:
         ctk.CTkRadioButton(fmts, text=lbl, variable=fmt_var, value=val,
-                           font=('DejaVu Sans Mono', 10), text_color=C['tx'],
+                           font=('Courier', 10), text_color=C['tx'],
                            fg_color=C['ac'], border_color=C['br']
                            ).pack(side='left', padx=10)
 
     msg_lbl = ctk.CTkLabel(popup, text="Choose format then save or view.",
-                            font=('DejaVu Sans Mono', 9), text_color=C['mu'])
+                            font=('Courier', 9), text_color=C['mu'])
     msg_lbl.pack(pady=6)
 
     btn_row = ctk.CTkFrame(popup, fg_color='transparent')

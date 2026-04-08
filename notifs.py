@@ -42,7 +42,7 @@ class NotifsScreen(ctk.CTkFrame):
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="🔔  NOTIFICATIONS", font=('DejaVu Sans Mono', 13, 'bold'),
+        ctk.CTkLabel(hdr, text="🔔  NOTIFICATIONS", font=('Courier', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         self.mon_btn = Btn(hdr, "▶  START MONITOR",
                            command=self._toggle_monitor, width=160)
@@ -59,7 +59,7 @@ class NotifsScreen(ctk.CTkFrame):
         status_card.pack(fill='x', padx=14, pady=(0,8))
         ctk.CTkLabel(status_card,
                      text="Notification Monitor — Linux D-Bus",
-                     font=('DejaVu Sans Mono', 10, 'bold'), text_color=C['bl']
+                     font=('Courier', 10, 'bold'), text_color=C['bl']
                      ).pack(anchor='w', padx=12, pady=(10,2))
         ctk.CTkLabel(status_card,
                      text="Mint Scan monitors system notifications via D-Bus on Linux.\n"
@@ -73,7 +73,7 @@ class NotifsScreen(ctk.CTkFrame):
                      ).pack(anchor='w', padx=12, pady=(0,10))
 
         self.mon_status = ctk.CTkLabel(status_card, text="● IDLE",
-                                        font=('DejaVu Sans Mono', 10, 'bold'), text_color=C['mu'])
+                                        font=('Courier', 10, 'bold'), text_color=C['mu'])
         self.mon_status.pack(anchor='w', padx=12, pady=(0,10))
 
         SectionHeader(body, '02', 'CAPTURED NOTIFICATIONS').pack(fill='x', padx=14, pady=(10,4))
@@ -177,14 +177,14 @@ class NotifsScreen(ctk.CTkFrame):
             row.pack(fill='x', pady=3)
             top = ctk.CTkFrame(row, fg_color='transparent')
             top.pack(fill='x', padx=12, pady=(8,2))
-            ctk.CTkLabel(top, text=n['app'], font=('DejaVu Sans Mono',10,'bold'),
+            ctk.CTkLabel(top, text=n['app'], font=('Courier',10,'bold'),
                          text_color=C['tx']).pack(side='left')
-            ctk.CTkLabel(top, text=n['time'], font=('DejaVu Sans Mono',8),
+            ctk.CTkLabel(top, text=n['time'], font=('Courier',8),
                          text_color=C['mu']).pack(side='right')
             ctk.CTkLabel(row, text=n['title'], font=MONO_SM,
                          text_color=C['tx']).pack(anchor='w', padx=12)
             if n['body']:
-                ctk.CTkLabel(row, text=n['body'], font=('DejaVu Sans Mono',9),
+                ctk.CTkLabel(row, text=n['body'], font=('Courier',9),
                              text_color=C['mu'], wraplength=650
                              ).pack(anchor='w', padx=12, pady=(0,8))
 

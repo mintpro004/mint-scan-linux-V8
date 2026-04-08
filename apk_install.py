@@ -47,7 +47,7 @@ class ApkScreen(ctk.CTkFrame):
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text="📦  APK INSTALLER",
-                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['ac']
+                     font=('Courier',13,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         self.dev_lbl = ctk.CTkLabel(hdr, text="● Scanning...",
                                      font=MONO_SM, text_color=C['mu'])
@@ -84,7 +84,7 @@ class ApkScreen(ctk.CTkFrame):
                  "  1. Settings → About Phone → tap Build Number 7 times\n"
                  "  2. Settings → Developer Options → USB Debugging → ON\n"
                  "  3. Connect USB cable → tap Allow on phone",
-            font=('DejaVu Sans Mono',8), text_color=C['mu'], justify='left'
+            font=('Courier',8), text_color=C['mu'], justify='left'
         ).pack(anchor='w', padx=12, pady=(4,10))
 
         # ── Device status ────────────────────────────────────
@@ -114,7 +114,7 @@ class ApkScreen(ctk.CTkFrame):
         self.apk_entry.pack(side='left', fill='x', expand=True, padx=(0,8))
         Btn(inp,'BROWSE', command=self._browse, variant='ghost', width=80).pack(side='left')
         self.apk_info_lbl = ctk.CTkLabel(apk_card, text="",
-                                          font=('DejaVu Sans Mono',8), text_color=C['mu'])
+                                          font=('Courier',8), text_color=C['mu'])
         self.apk_info_lbl.pack(anchor='w', padx=12, pady=(0,6))
 
         # ── Install options ──────────────────────────────────
@@ -154,7 +154,7 @@ class ApkScreen(ctk.CTkFrame):
         self.prog.pack(fill='x', padx=12, pady=(0,6))
         self.prog.set(0)
 
-        self.output = ctk.CTkTextbox(inst_card, height=150, font=('DejaVu Sans Mono',8),
+        self.output = ctk.CTkTextbox(inst_card, height=150, font=('Courier',8),
                                       fg_color=C['bg'], text_color=C['ok'],
                                       border_width=0)
         self.output.pack(fill='x', padx=8, pady=(0,8))

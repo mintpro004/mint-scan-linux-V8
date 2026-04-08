@@ -131,7 +131,7 @@ class SpeedometerGauge(tk.Canvas):
                 lx = cx + (r - track_w - int(s*0.09)) * math.cos(ang_r)
                 ly = cy - (r - track_w - int(s*0.09)) * math.sin(ang_r)
                 self.create_text(lx, ly, text=str(tick_val),
-                                 fill=C['mu'], font=('DejaVu Sans Mono', max(6, int(s*0.045))))
+                                 fill=C['mu'], font=('Courier', max(6, int(s*0.045))))
 
         # ── Needle ──────────────────────────────────────────
         needle_ang_r = math.radians(START + SWEEP * (val / self._max if self._max else 0))
@@ -168,16 +168,16 @@ class SpeedometerGauge(tk.Canvas):
         self.create_text(cx, cy + int(s * 0.13),
                          text=disp,
                          fill=active_col if active_t > 0.01 else C['mu'],
-                         font=('DejaVu Sans Mono', font_size, 'bold'))
+                         font=('Courier', font_size, 'bold'))
         self.create_text(cx, cy + int(s * 0.22),
                          text=self._unit,
-                         fill=C['mu'], font=('DejaVu Sans Mono', max(7, int(s*0.05))))
+                         fill=C['mu'], font=('Courier', max(7, int(s*0.05))))
 
         # ── Label ────────────────────────────────────────────
         self.create_text(cx, int(s * 0.10),
                          text=self._label,
                          fill=self._color,
-                         font=('DejaVu Sans Mono', max(7, int(s*0.055)), 'bold'))
+                         font=('Courier', max(7, int(s*0.055)), 'bold'))
 
         # Bottom label
         grade = '—'
@@ -190,7 +190,7 @@ class SpeedometerGauge(tk.Canvas):
             self.create_text(cx, int(s * 0.90),
                              text=f'GRADE  {grade}',
                              fill=g_col,
-                             font=('DejaVu Sans Mono', max(7, int(s*0.05)), 'bold'))
+                             font=('Courier', max(7, int(s*0.05)), 'bold'))
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -228,7 +228,7 @@ class PingGraph(tk.Canvas):
             self.create_line(0, gy, w, gy, fill=C['br'], width=1, dash=(3,6))
             ms_label = int(mx * pct)
             self.create_text(2, gy, text=f'{ms_label}ms',
-                             fill=C['mu'], font=('DejaVu Sans Mono',7), anchor='nw')
+                             fill=C['mu'], font=('Courier',7), anchor='nw')
 
         def to_pt(i, v):
             x = pad + i * (w - 2*pad) / max(n-1,1)
@@ -258,7 +258,7 @@ class PingGraph(tk.Canvas):
             self.create_oval(lx-5, ly-5, lx+5, ly+5,
                              fill=col, outline=C['bg'], width=2)
             self.create_text(lx+8, ly, text=f'{v:.0f}ms',
-                             fill=col, font=('DejaVu Sans Mono',8,'bold'), anchor='w')
+                             fill=col, font=('Courier',8,'bold'), anchor='w')
 
         # Avg line
         avg_y = pad + (1 - avg_v/mx) * (h - 2*pad)
@@ -306,7 +306,7 @@ class NetworkScreen(ctk.CTkFrame):
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text='📡  NETWORK',
-                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['ac']
+                     font=('Courier',13,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         self._speed_btn = Btn(hdr, '▶ SPEED TEST',
                               command=self._run_speed, width=130)
@@ -329,7 +329,7 @@ class NetworkScreen(ctk.CTkFrame):
         ph.pack(fill='x', padx=10, pady=(8,4))
         LiveBadge(ph).pack(side='left')
         self._ping_val = ctk.CTkLabel(ph, text='— ms',
-                                       font=('DejaVu Sans Mono',13,'bold'),
+                                       font=('Courier',13,'bold'),
                                        text_color=C['ok'])
         self._ping_val.pack(side='right')
 
@@ -339,13 +339,13 @@ class NetworkScreen(ctk.CTkFrame):
         stats = ctk.CTkFrame(ping_card, fg_color='transparent')
         stats.pack(fill='x', padx=10, pady=(0,10))
         self._ping_min = ctk.CTkLabel(stats, text='MIN: —',
-                                       font=('DejaVu Sans Mono',8), text_color=C['ok'])
+                                       font=('Courier',8), text_color=C['ok'])
         self._ping_avg = ctk.CTkLabel(stats, text='AVG: —',
-                                       font=('DejaVu Sans Mono',8), text_color=C['am'])
+                                       font=('Courier',8), text_color=C['am'])
         self._ping_max = ctk.CTkLabel(stats, text='MAX: —',
-                                       font=('DejaVu Sans Mono',8), text_color=C['wn'])
+                                       font=('Courier',8), text_color=C['wn'])
         self._ping_jitter = ctk.CTkLabel(stats, text='JITTER: —',
-                                          font=('DejaVu Sans Mono',8), text_color=C['mu'])
+                                          font=('Courier',8), text_color=C['mu'])
         for l in [self._ping_min, self._ping_avg,
                   self._ping_max, self._ping_jitter]:
             l.pack(side='left', padx=10)
@@ -394,10 +394,10 @@ class NetworkScreen(ctk.CTkFrame):
         status_row.pack(fill='x', padx=10, pady=(0,12))
         self._speed_status = ctk.CTkLabel(status_row,
                                            text='Tap ▶ SPEED TEST to start',
-                                           font=('DejaVu Sans Mono',10), text_color=C['mu'])
+                                           font=('Courier',10), text_color=C['mu'])
         self._speed_status.pack(side='left')
         self._speed_grade = ctk.CTkLabel(status_row, text='',
-                                          font=('DejaVu Sans Mono',14,'bold'),
+                                          font=('Courier',14,'bold'),
                                           text_color=C['ok'])
         self._speed_grade.pack(side='right', padx=10)
 
@@ -466,9 +466,9 @@ class NetworkScreen(ctk.CTkFrame):
         find_row = ctk.CTkFrame(tlog_card, fg_color='transparent')
         find_row.pack(fill='x', padx=8, pady=(0,4))
         ctk.CTkLabel(find_row, text='Find:',
-                     font=('DejaVu Sans Mono',9), text_color=C['mu']).pack(side='left')
+                     font=('Courier',9), text_color=C['mu']).pack(side='left')
         self._find_entry = ctk.CTkEntry(find_row, width=200,
-                                         font=('DejaVu Sans Mono',9),
+                                         font=('Courier',9),
                                          fg_color=C['bg'], border_color=C['br'],
                                          text_color=C['tx'], height=26,
                                          placeholder_text='search...')
@@ -478,12 +478,12 @@ class NetworkScreen(ctk.CTkFrame):
         Btn(find_row, '↑ PREV', command=self._find_prev,
             variant='ghost', width=70).pack(side='left', padx=2)
         self._find_lbl = ctk.CTkLabel(find_row, text='',
-                                       font=('DejaVu Sans Mono',8), text_color=C['mu'])
+                                       font=('Courier',8), text_color=C['mu'])
         self._find_lbl.pack(side='left', padx=6)
 
         # The log box — always normal state, fully interactive
         self._tlog = ctk.CTkTextbox(tlog_card, height=200,
-                                     font=('DejaVu Sans Mono',10),
+                                     font=('Courier',10),
                                      fg_color=C['bg'],
                                      text_color=C['ok'],
                                      border_width=0,
@@ -544,8 +544,6 @@ class NetworkScreen(ctk.CTkFrame):
     # ── SPEED TEST ────────────────────────────────────────────────
 
     def _run_speed(self):
-        if not hasattr(self, '_speed_status'):
-            return  # UI not fully built yet
         self._speed_btn.configure(state='disabled', text='TESTING...')
         self._speed_status.configure(text='Initialising speed test...',
                                       text_color=C['ac'])
@@ -650,13 +648,13 @@ class NetworkScreen(ctk.CTkFrame):
                                corner_radius=6)
             row.pack(fill='x', pady=2)
             ctk.CTkLabel(row, text=iface['name'],
-                         font=('DejaVu Sans Mono',10,'bold'),
+                         font=('Courier',10,'bold'),
                          text_color=C['ac']).pack(side='left', padx=10, pady=6)
             ctk.CTkLabel(row, text=iface['ip4'],
                          font=MONO_SM,
                          text_color=C['tx']).pack(side='left', padx=8)
             ctk.CTkLabel(row, text=iface.get('mac','—'),
-                         font=('DejaVu Sans Mono',8),
+                         font=('Courier',8),
                          text_color=C['mu']).pack(side='right', padx=10)
 
         # Public identity
@@ -681,7 +679,7 @@ class NetworkScreen(ctk.CTkFrame):
             hdr_row.pack(fill='x', pady=(0,2))
             for txt, w_ in [('LOCAL',120),('REMOTE',140),('PROCESS',160)]:
                 ctk.CTkLabel(hdr_row, text=txt,
-                             font=('DejaVu Sans Mono',8,'bold'),
+                             font=('Courier',8,'bold'),
                              text_color=C['mu'], width=w_).pack(side='left', padx=4)
             for c in conns[:10]:
                 r = ctk.CTkFrame(self._conn_frame, fg_color=C['sf'],
@@ -689,13 +687,13 @@ class NetworkScreen(ctk.CTkFrame):
                                  corner_radius=4)
                 r.pack(fill='x', pady=1)
                 ctk.CTkLabel(r, text=c['local'],
-                             font=('DejaVu Sans Mono',8), text_color=C['tx'], width=120
+                             font=('Courier',8), text_color=C['tx'], width=120
                              ).pack(side='left', padx=4, pady=4)
                 ctk.CTkLabel(r, text=c['remote'],
-                             font=('DejaVu Sans Mono',8), text_color=C['ac'], width=140
+                             font=('Courier',8), text_color=C['ac'], width=140
                              ).pack(side='left', padx=4)
                 ctk.CTkLabel(r, text=c.get('process','—')[:24],
-                             font=('DejaVu Sans Mono',8), text_color=C['mu'], width=160
+                             font=('Courier',8), text_color=C['mu'], width=160
                              ).pack(side='left', padx=4)
         else:
             ctk.CTkLabel(self._conn_frame,

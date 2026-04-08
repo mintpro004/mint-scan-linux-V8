@@ -190,7 +190,7 @@ class UpdaterScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text='🔄  SOFTWARE UPDATER',
-                     font=('DejaVu Sans Mono', 13, 'bold'),
+                     font=('Courier', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         Btn(hdr, '🔍 CHECK NOW', command=self._check,
             width=130).pack(side='right', padx=8, pady=6)
@@ -230,7 +230,7 @@ class UpdaterScreen(ctk.CTkFrame):
         log_card = Card(body)
         log_card.pack(fill='x', padx=14, pady=(0, 8))
         self._log_box = ctk.CTkTextbox(
-            log_card, height=160, font=('DejaVu Sans Mono', 9),
+            log_card, height=160, font=('Courier', 9),
             fg_color=C['bg'], text_color=C['ok'], border_width=0)
         self._log_box.pack(fill='x', padx=8, pady=8)
         self._log_box.configure(state='disabled')
@@ -242,7 +242,7 @@ class UpdaterScreen(ctk.CTkFrame):
         mc.pack(fill='x', padx=14, pady=(0, 14))
         ctk.CTkLabel(mc,
             text='cd ~/mint-scan-linux\ngit pull origin main\nbash install.sh\nbash run.sh',
-            font=('DejaVu Sans Mono', 10), text_color=C['ac'], justify='left'
+            font=('Courier', 10), text_color=C['ac'], justify='left'
             ).pack(anchor='w', padx=12, pady=12)
 
     def _ulog(self, msg):
@@ -254,8 +254,6 @@ class UpdaterScreen(ctk.CTkFrame):
         self._safe_after(0, _do)
 
     def _check(self):
-        if not hasattr(self, '_status_lbl'):
-            return  # UI not fully built yet
         self._status_lbl.configure(text='Checking GitHub...', text_color=C['ac'])
         self._ulog('Connecting to GitHub API...')
         def _bg():
