@@ -544,6 +544,8 @@ class NetworkScreen(ctk.CTkFrame):
     # ── SPEED TEST ────────────────────────────────────────────────
 
     def _run_speed(self):
+        if not hasattr(self, '_speed_status'):
+            return  # UI not fully built yet
         self._speed_btn.configure(state='disabled', text='TESTING...')
         self._speed_status.configure(text='Initialising speed test...',
                                       text_color=C['ac'])

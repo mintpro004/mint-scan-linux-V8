@@ -367,6 +367,8 @@ class SettingsScreen(ctk.CTkFrame):
         _widgets.C['ac'] = colour
 
     def _save(self):
+        if not hasattr(self, 'font_slider'):
+            return  # UI not fully built yet
         self.settings = {
             'font_size':     int(self.font_slider.get()),
             'ui_scale':      round(float(self.scale_slider.get()), 1),

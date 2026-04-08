@@ -264,13 +264,23 @@ class Card(ctk.CTkFrame):
         return getattr(self._surface, name)
 
     # Allow children to be packed directly into Card by overriding
-    # tkinter's internal parent resolution
+    # tkinter's internal parent resolution.
+    # We need both getter AND setter because tkinter's Widget.__init__
+    # does  self._w = master._w + '.' + name  before our __init__ runs.
+    # Without a setter the assignment raises "property has no setter".
     @property
     def _w(self):
         try:
             return self._surface._w
-        except Exception:
-            return super()._w
+        except AttributeError:
+            # _surface not yet created (called during super().__init__)
+            return self.__dict__.get('_w_fallback', '')
+
+    @_w.setter
+    def _w(self, value):
+        # Store the raw tkinter widget path assigned during base __init__.
+        # Once _surface is built, reads will use _surface._w instead.
+        self.__dict__['_w_fallback'] = value
 
 
 # ── SectionHeader ─────────────────────────────────────────────────

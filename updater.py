@@ -254,6 +254,8 @@ class UpdaterScreen(ctk.CTkFrame):
         self._safe_after(0, _do)
 
     def _check(self):
+        if not hasattr(self, '_status_lbl'):
+            return  # UI not fully built yet
         self._status_lbl.configure(text='Checking GitHub...', text_color=C['ac'])
         self._ulog('Connecting to GitHub API...')
         def _bg():
