@@ -65,14 +65,21 @@ def run_cmd(cmd, timeout=8):
         return '', str(e), 1
 
 
+_ip_cache = {'data': {}, 'ts': 0}
+
 def get_public_ip_info():
-    """Fetch real public IP, ISP, city, country from ipapi.co."""
+    """Fetch real public IP, ISP, city, country from ipapi.co. Cached 5 min."""
     import requests
+    now = time.time()
+    if _ip_cache['data'] and (now - _ip_cache['ts']) < 300:
+        return _ip_cache['data']
     try:
         r = requests.get('https://ipapi.co/json/', timeout=6)
-        return r.json()
+        _ip_cache['data'] = r.json()
+        _ip_cache['ts']   = now
+        return _ip_cache['data']
     except Exception:
-        return {}
+        return _ip_cache['data'] or {}
 
 
 def get_local_ip():
