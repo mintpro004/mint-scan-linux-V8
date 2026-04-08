@@ -208,7 +208,7 @@ class ToolboxScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text="🛠  SECURITY TOOLBOX",
-                     font=('Courier',13,'bold'), text_color=C['ac']
+                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         Btn(hdr, "↺ REFRESH",
             command=lambda: threading.Thread(target=self._check_all, daemon=True).start(),
@@ -241,7 +241,7 @@ class ToolboxScreen(ctk.CTkFrame):
         # Action log
         SectionHeader(body, '03', 'ACTION LOG').pack(fill='x', padx=14, pady=(8,4))
         self.action_log = ctk.CTkTextbox(
-            body, height=120, font=('Courier',8),
+            body, height=120, font=('DejaVu Sans Mono',8),
             fg_color=C['s2'], text_color=C['ok'],
             border_color=C['br'], border_width=1, corner_radius=6)
         self.action_log.pack(fill='x', padx=14, pady=(0,14))
@@ -260,20 +260,20 @@ class ToolboxScreen(ctk.CTkFrame):
         name_row = ctk.CTkFrame(left, fg_color='transparent')
         name_row.pack(fill='x')
 
-        status_dot = ctk.CTkLabel(name_row, text='●', font=('Courier',12),
+        status_dot = ctk.CTkLabel(name_row, text='●', font=('DejaVu Sans Mono',12),
                                    text_color=C['mu'])
         status_dot.pack(side='left', padx=(0,6))
 
         ctk.CTkLabel(name_row, text=tool['label'],
-                     font=('Courier',10,'bold'), text_color=C['tx']
+                     font=('DejaVu Sans Mono',10,'bold'), text_color=C['tx']
                      ).pack(side='left')
 
         ver_lbl = ctk.CTkLabel(left, text=tool['desc'],
-                                font=('Courier',8), text_color=C['mu'])
+                                font=('DejaVu Sans Mono',8), text_color=C['mu'])
         ver_lbl.pack(anchor='w')
 
         docs_lbl = ctk.CTkLabel(left, text=f"Usage: {tool['docs']}",
-                                 font=('Courier',7), text_color=C['br2'])
+                                 font=('DejaVu Sans Mono',7), text_color=C['br2'])
         docs_lbl.pack(anchor='w')
 
         # Buttons

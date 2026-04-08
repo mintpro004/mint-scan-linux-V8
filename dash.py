@@ -85,15 +85,15 @@ class ScoreRing(tk.Canvas):
 
         # Score number
         self.create_text(cx, cy-10, text=f'{int(score)}',
-                         fill=col, font=('Courier', 34, 'bold'))
+                         fill=col, font=('DejaVu Sans Mono', 34, 'bold'))
         self.create_text(cx, cy+16, text='SCORE',
-                         fill=C['mu'], font=('Courier', 8))
+                         fill=C['mu'], font=('DejaVu Sans Mono', 8))
 
         grade = ('A+' if score>=95 else 'A' if score>=85 else 'B' if score>=70
                  else 'C' if score>=55 else 'D')
         grade_col = (C['ok'] if score>=85 else C['am'] if score>=60 else C['wn'])
         self.create_text(cx, cy+30, text=grade,
-                         fill=grade_col, font=('Courier', 10, 'bold'))
+                         fill=grade_col, font=('DejaVu Sans Mono', 10, 'bold'))
 
 
 class MiniChart(tk.Canvas):
@@ -154,19 +154,19 @@ class StatCard(ctk.CTkFrame):
         # Top row: icon + value
         top = ctk.CTkFrame(self, fg_color='transparent')
         top.pack(fill='x', padx=10, pady=(10,0))
-        ctk.CTkLabel(top, text=icon, font=('Courier', 16),
+        ctk.CTkLabel(top, text=icon, font=('DejaVu Sans Mono', 16),
                      text_color=color).pack(side='left')
         self._val = ctk.CTkLabel(top, text='—',
-                                  font=('Courier', 18, 'bold'),
+                                  font=('DejaVu Sans Mono', 18, 'bold'),
                                   text_color=color)
         self._val.pack(side='right')
         # Label + sub
         bot = ctk.CTkFrame(self, fg_color='transparent')
         bot.pack(fill='x', padx=10, pady=(0,4))
         ctk.CTkLabel(bot, text=label.upper(),
-                     font=('Courier', 7), text_color=C['mu']).pack(side='left')
+                     font=('DejaVu Sans Mono', 7), text_color=C['mu']).pack(side='left')
         self._sub = ctk.CTkLabel(bot, text='',
-                                  font=('Courier', 7), text_color=C['mu2'])
+                                  font=('DejaVu Sans Mono', 7), text_color=C['mu2'])
         self._sub.pack(side='right')
         # Mini chart
         if chart:
@@ -250,14 +250,14 @@ class DashScreen(ctk.CTkFrame):
         hdr.pack_propagate(False)
 
         ctk.CTkLabel(hdr, text='⬡  DASHBOARD',
-                     font=('Courier', 13, 'bold'),
+                     font=('DejaVu Sans Mono', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
 
         # Status indicator
         self._pulse = PulseIndicator(hdr, color=C['ok'])
         self._pulse.pack(side='left', padx=4)
         self._status_lbl = ctk.CTkLabel(hdr, text='SECURE',
-                                         font=('Courier', 9, 'bold'),
+                                         font=('DejaVu Sans Mono', 9, 'bold'),
                                          text_color=C['ok'])
         self._status_lbl.pack(side='left', padx=2)
 
@@ -284,7 +284,7 @@ class DashScreen(ctk.CTkFrame):
         self._score_ring = ScoreRing(ring_inner, size=180)
         self._score_ring.pack()
         ctk.CTkLabel(ring_inner, text='SECURITY SCORE',
-                     font=('Courier', 8), text_color=C['mu']).pack(pady=(4,0))
+                     font=('DejaVu Sans Mono', 8), text_color=C['mu']).pack(pady=(4,0))
 
         # Stat cards right (2×2 grid)
         cards_frame = ctk.CTkFrame(hero, fg_color='transparent')
@@ -322,14 +322,14 @@ class DashScreen(ctk.CTkFrame):
                              border_color=col, border_width=1,
                              corner_radius=6)
             f.pack(side='left', fill='both', expand=True, padx=3)
-            ctk.CTkLabel(f, text=icon, font=('Courier', 14),
+            ctk.CTkLabel(f, text=icon, font=('DejaVu Sans Mono', 14),
                          text_color=col).pack(pady=(8,0))
             lbl = ctk.CTkLabel(f, text='—',
-                               font=('Courier', 9, 'bold'),
+                               font=('DejaVu Sans Mono', 9, 'bold'),
                                text_color=col)
             lbl.pack()
             ctk.CTkLabel(f, text=label,
-                         font=('Courier', 7), text_color=C['mu']).pack(pady=(0,8))
+                         font=('DejaVu Sans Mono', 7), text_color=C['mu']).pack(pady=(0,8))
             self._threat_cards[key] = lbl
 
         # ── SYSTEM INFO ─────────────────────────────────────────
@@ -356,7 +356,7 @@ class DashScreen(ctk.CTkFrame):
         self._proc_card = Card(body)
         self._proc_card.pack(fill='x', padx=14, pady=(0,14))
         self._proc_box = ctk.CTkTextbox(self._proc_card, height=120,
-                                         font=('Courier', 9),
+                                         font=('DejaVu Sans Mono', 9),
                                          fg_color=C['bg'],
                                          text_color=C['tx'],
                                          border_width=0)

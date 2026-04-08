@@ -128,7 +128,7 @@ class DevScanScreen(ctk.CTkFrame):
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text="📡  DEVICE SCANNER — IoT · CCTV · APPLIANCES",
-                     font=('Courier',12,'bold'), text_color=C['ac']
+                     font=('DejaVu Sans Mono',12,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         self.stop_btn = Btn(hdr, "⏹ STOP", command=self._stop,
                             variant='danger', width=80)
@@ -168,7 +168,7 @@ class DevScanScreen(ctk.CTkFrame):
                          (self.opt_infect, 'Infection check'),
                          (self.opt_banner, 'Banner grab')]:
             ctk.CTkCheckBox(opt_row, text=lbl, variable=var,
-                font=('Courier',8), text_color=C['tx'],
+                font=('DejaVu Sans Mono',8), text_color=C['tx'],
                 fg_color=C['ac'], checkmark_color=C['bg'],
                 border_color=C['br'], hover_color=C['br2']
             ).pack(side='left', padx=(0,14))
@@ -211,7 +211,7 @@ class DevScanScreen(ctk.CTkFrame):
         log_card = Card(body)
         log_card.pack(fill='x', padx=14, pady=(0,14))
         self.log_box = ctk.CTkTextbox(log_card, height=130,
-            font=('Courier',9), fg_color=C['bg'],
+            font=('DejaVu Sans Mono',9), fg_color=C['bg'],
             text_color=C['ok'], border_width=0)
         self.log_box.pack(fill='x', padx=8, pady=8)
 
@@ -529,7 +529,7 @@ class DevScanScreen(ctk.CTkFrame):
                                 border_color=C['br'], border_width=1, corner_radius=6)
             card.pack(side='left', padx=3, pady=2)
             ctk.CTkLabel(card, text=f"{icon} {dtype}\n×{count}",
-                         font=('Courier',8), text_color=C['tx'], justify='center'
+                         font=('DejaVu Sans Mono',8), text_color=C['tx'], justify='center'
                          ).pack(padx=10, pady=6)
 
         # Infected section
@@ -569,23 +569,23 @@ class DevScanScreen(ctk.CTkFrame):
         top = ctk.CTkFrame(card, fg_color='transparent')
         top.pack(fill='x', padx=12, pady=(10,4))
         ctk.CTkLabel(top, text=f"{dev['icon']} {dev['ip']}",
-                     font=('Courier',12,'bold'), text_color=col).pack(side='left')
+                     font=('DejaVu Sans Mono',12,'bold'), text_color=col).pack(side='left')
         ctk.CTkLabel(top, text=dev['type'],
-                     font=('Courier',9), text_color=C['mu']).pack(side='left', padx=8)
+                     font=('DejaVu Sans Mono',9), text_color=C['mu']).pack(side='left', padx=8)
         if dev.get('vendor'):
             ctk.CTkLabel(top, text=dev['vendor'],
-                         font=('Courier',8), text_color=C['br2']).pack(side='left')
+                         font=('DejaVu Sans Mono',8), text_color=C['br2']).pack(side='left')
 
         for reason in dev['infect_reasons']:
             lvl_col = C['wn'] if 'CRIT' in reason or 'HIGH' in reason else C['am']
             ctk.CTkLabel(card, text=f"  ⚠ {reason}",
-                         font=('Courier',9), text_color=lvl_col,
+                         font=('DejaVu Sans Mono',9), text_color=lvl_col,
                          justify='left').pack(anchor='w', padx=12)
 
         if dev['ports']:
             ctk.CTkLabel(card,
                          text="  Ports: " + ', '.join(dev['ports'][:12]),
-                         font=('Courier',8), text_color=C['mu']
+                         font=('DejaVu Sans Mono',8), text_color=C['mu']
                          ).pack(anchor='w', padx=12, pady=(2,8))
 
     def _render_device_card(self, dev):
@@ -605,29 +605,29 @@ class DevScanScreen(ctk.CTkFrame):
 
         # Icon + IP + type
         ctk.CTkLabel(top, text=dev['icon'],
-                     font=('Courier',16), text_color=border).pack(side='left', padx=(0,8))
+                     font=('DejaVu Sans Mono',16), text_color=border).pack(side='left', padx=(0,8))
         info = ctk.CTkFrame(top, fg_color='transparent')
         info.pack(side='left', fill='both', expand=True)
         ip_row = ctk.CTkFrame(info, fg_color='transparent')
         ip_row.pack(anchor='w')
         ctk.CTkLabel(ip_row, text=dev['ip'],
-                     font=('Courier',11,'bold'), text_color=C['ac']).pack(side='left')
+                     font=('DejaVu Sans Mono',11,'bold'), text_color=C['ac']).pack(side='left')
         if dev['host']:
             ctk.CTkLabel(ip_row, text=f"  ({dev['host']})",
-                         font=('Courier',9), text_color=C['mu']).pack(side='left')
+                         font=('DejaVu Sans Mono',9), text_color=C['mu']).pack(side='left')
         if dev['infected']:
             ctk.CTkLabel(ip_row, text=" ⚠ INFECTED",
-                         font=('Courier',9,'bold'), text_color=C['wn']).pack(side='left', padx=6)
+                         font=('DejaVu Sans Mono',9,'bold'), text_color=C['wn']).pack(side='left', padx=6)
         elif dev['risks']:
             ctk.CTkLabel(ip_row, text=" ⚡ RISKY",
-                         font=('Courier',9,'bold'), text_color=C['am']).pack(side='left', padx=6)
+                         font=('DejaVu Sans Mono',9,'bold'), text_color=C['am']).pack(side='left', padx=6)
 
         meta = dev['type']
         if dev.get('vendor'):
             meta += f"  ·  {dev['vendor']}"
         if dev.get('mac'):
             meta += f"  ·  {dev['mac']}"
-        ctk.CTkLabel(info, text=meta, font=('Courier',8),
+        ctk.CTkLabel(info, text=meta, font=('DejaVu Sans Mono',8),
                      text_color=C['mu']).pack(anchor='w')
 
         # Ports
@@ -636,7 +636,7 @@ class DevScanScreen(ctk.CTkFrame):
                 f":{p}" + (' ⚠' if p in INFECTED_PORTS else '')
                 for p in dev['ports'][:10])
             ctk.CTkLabel(card, text=ports_str,
-                         font=('Courier',8), text_color=C['mu']
+                         font=('DejaVu Sans Mono',8), text_color=C['mu']
                          ).pack(anchor='w', padx=12, pady=(0,4))
 
         # Risks
@@ -644,14 +644,14 @@ class DevScanScreen(ctk.CTkFrame):
             col = RISK_COLOR.get(lvl, C['am'])
             ctk.CTkLabel(card,
                 text=f"  [{lvl}] {name} :{port}",
-                font=('Courier',8), text_color=col
+                font=('DejaVu Sans Mono',8), text_color=col
             ).pack(anchor='w', padx=12)
 
         # Banner
         if dev.get('banner'):
             short = dev['banner'][:100].replace('\r','').replace('\n',' ')
             ctk.CTkLabel(card, text=f"  Banner: {short}",
-                         font=('Courier',7), text_color=C['br2']
+                         font=('DejaVu Sans Mono',7), text_color=C['br2']
                          ).pack(anchor='w', padx=12, pady=(0,6))
         else:
             card.pack_configure(pady=(0, 4))
@@ -689,10 +689,10 @@ class DevScanScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(popup,
             text=f"{dev['icon']}  {dev['ip']}  —  {dev['type']}",
-            font=('Courier',14,'bold'), text_color=C['ac']
+            font=('DejaVu Sans Mono',14,'bold'), text_color=C['ac']
         ).pack(pady=(16,4))
 
-        box = ctk.CTkTextbox(popup, font=('Courier',10),
+        box = ctk.CTkTextbox(popup, font=('DejaVu Sans Mono',10),
                              fg_color=C['s2'], text_color=C['tx'],
                              border_color=C['br'], border_width=1)
         box.pack(fill='both', expand=True, padx=14, pady=(0,14))
