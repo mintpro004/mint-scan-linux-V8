@@ -7,7 +7,7 @@ import customtkinter as ctk
 import threading, time, sys, os, json
 
 # Import colour palette from widgets (single source of truth)
-from widgets import C, apply_theme, ScrollableFrame
+from widgets import C, apply_theme, ScrollableFrame, MONO, MONO_SM, MONO_LG, FONT
 from logger import get_logger as _gl
 _log = _gl('app')
 
@@ -95,15 +95,15 @@ class MintScanApp:
 
         # Logo
         ctk.CTkLabel(inner, text="[ MINT SCAN ]",
-                     font=('Courier',34,'bold'),
+                     font=(FONT,32,'bold'),
                      text_color=C['ac']).pack(anchor='w')
         ctk.CTkLabel(inner, text="ADVANCED SECURITY AUDITOR  v8.0  |  MINT PROJECTS",
-                     font=('Courier',9), text_color=C['mu']
+                     font=(FONT,9), text_color=C['mu']
                      ).pack(anchor='w', pady=(2,18))
 
         # Boot log
         self.boot_log = ctk.CTkTextbox(inner, width=500, height=200,
-                                        font=('Courier',9),
+                                        font=(FONT,10),
                                         fg_color=C['s2'],
                                         text_color=C['ac'],
                                         border_color=C['br'],
@@ -182,10 +182,10 @@ class MintScanApp:
                 banner.configure(fg_color=C['sf'])
                 import tkinter as tk
                 tk.Label(banner, text=f'⚠ {title}',
-                         font=('Courier', 10, 'bold'),
+                         font=('DejaVu Sans Mono', 10, 'bold'),
                          fg=col, bg=C['sf']).pack(anchor='w', padx=10, pady=(8,0))
                 tk.Label(banner, text=msg[:80],
-                         font=('Courier', 9),
+                         font=('DejaVu Sans Mono', 9),
                          fg=C['tx'], bg=C['sf']).pack(anchor='w', padx=10)
                 banner.after(6000, banner.destroy)
             except Exception:
@@ -197,7 +197,7 @@ class MintScanApp:
     def _build_ui(self):
 
         # ── Top navbar ────────────────────────────────────────
-        self.navbar = ctk.CTkFrame(self.root, height=52,
+        self.navbar = ctk.CTkFrame(self.root, height=54,
                                    fg_color=C['sf'], corner_radius=0)
         self.navbar.pack(fill='x', side='top')
         self.navbar.pack_propagate(False)
@@ -206,25 +206,27 @@ class MintScanApp:
         logo_frame = ctk.CTkFrame(self.navbar, fg_color='transparent')
         logo_frame.pack(side='left', padx=16)
         ctk.CTkLabel(logo_frame, text="[ MINT SCAN ]",
-                     font=('Courier',14,'bold'),
+                     font=(FONT,14,'bold'),
                      text_color=C['ac']).pack(side='left')
         ctk.CTkLabel(logo_frame, text=" v8",
-                     font=('Courier',9),
+                     font=(FONT,9),
                      text_color=C['mu']).pack(side='left', pady=(4,0))
 
         # Right: clock + score
         self.clock_lbl = ctk.CTkLabel(self.navbar, text="--:--:--",
-                                       font=('Courier',10), text_color=C['mu'])
+                                       font=(FONT,10), text_color=C['mu'])
         self.clock_lbl.pack(side='right', padx=16)
 
         self.score_lbl = ctk.CTkLabel(self.navbar, text="SCORE --",
-                                       font=('Courier',10,'bold'),
+                                       font=(FONT,10,'bold'),
                                        text_color=C['ok'])
         self.score_lbl.pack(side='right', padx=(0,8))
 
-        # Thin accent line under navbar
-        ctk.CTkFrame(self.root, height=2,
-                     fg_color=C['br'], corner_radius=0).pack(fill='x', side='top')
+        # 3D accent line under navbar — shadow then highlight
+        ctk.CTkFrame(self.root, height=1,
+                     fg_color=C['brd'], corner_radius=0).pack(fill='x', side='top')
+        ctk.CTkFrame(self.root, height=1,
+                     fg_color=C['brt'], corner_radius=0).pack(fill='x', side='top')
 
         # ── Main container ────────────────────────────────────
         self.container = ctk.CTkFrame(self.root, fg_color=C['bg'], corner_radius=0)
@@ -238,7 +240,7 @@ class MintScanApp:
 
         # Sidebar header label
         ctk.CTkLabel(self.sidebar, text="NAVIGATION",
-                     font=('Courier',7,'bold'), text_color=C['mu']
+                     font=(FONT,8,'bold'), text_color=C['mu']
                      ).pack(anchor='w', padx=12, pady=(10,4))
 
         # ── Content area ──────────────────────────────────────
@@ -307,11 +309,11 @@ class MintScanApp:
             btn = ctk.CTkButton(
                 self.sidebar,
                 text=f" {icon}  {label}",
-                font=('Courier', 10),
-                height=38,
+                font=(FONT, 10),
+                height=36,
                 anchor='w',
-                fg_color='transparent',
-                hover_color=C['br'],
+                fg_color=C['bg'],
+                hover_color=C['s2'],
                 text_color=C['mu'],
                 corner_radius=6,
                 border_width=0,
@@ -324,7 +326,7 @@ class MintScanApp:
         ctk.CTkFrame(self.sidebar, height=1,
                      fg_color=C['br']).pack(fill='x', side='bottom', pady=(0,8))
         ctk.CTkLabel(self.sidebar, text="MINT PROJECTS  •  PTY",
-                     font=('Courier',7), text_color=C['br2']
+                     font=(FONT,7), text_color=C['br2']
                      ).pack(side='bottom', pady=(0,4))
 
         # ── Instantiate screen frames ─────────────────────────
@@ -438,58 +440,61 @@ class MintScanApp:
 
         # Rebuild sidebar header
         ctk.CTkLabel(self.sidebar, text="NAVIGATION",
-                     font=('Courier',7,'bold'), text_color=C['mu']
+                     font=(FONT,8,'bold'), text_color=C['mu']
                      ).pack(anchor='w', padx=12, pady=(10,4))
 
-        # Re-instantiate screens using importlib (mirrors _build_ui; avoids NameError
-        # on module names that are never imported at the top level of this file)
-        import importlib as _il2
-        _base2 = os.path.dirname(os.path.abspath(__file__))
-        if _base2 not in sys.path:
-            sys.path.insert(0, _base2)
+        # Remember current tab before rebuilding
+        current = self.current_tab
 
-        def _safe2(mod, cls):
+        # Re-instantiate screens using importlib (same safe pattern as _build_ui)
+        import importlib as _il
+        _base = os.path.dirname(os.path.abspath(__file__))
+        if _base not in sys.path:
+            sys.path.insert(0, _base)
+
+        def _safe(mod, cls):
             try:
-                return getattr(_il2.import_module(mod), cls)
+                return getattr(_il.import_module(mod), cls)
             except Exception as e:
-                _log.debug(f"[skip] {mod}: {e}")
+                _log.debug(f'[skip] {mod}: {e}')
                 return None
 
-        screen_map = {k: v for k, v in {
-            'dash':        _safe2('dash',        'DashScreen'),
-            'perms':       _safe2('perms',       'PermsScreen'),
-            'wifi':        _safe2('wifi',        'WifiScreen'),
-            'calls':       _safe2('calls',       'CallsScreen'),
-            'network':     _safe2('network',     'NetworkScreen'),
-            'battery':     _safe2('battery',     'BatteryScreen'),
-            'threats':     _safe2('threats',     'ThreatsScreen'),
-            'notifs':      _safe2('notifs',      'NotifsScreen'),
-            'ports':       _safe2('ports',       'PortsScreen'),
-            'usb':         _safe2('usb',         'UsbScreen'),
-            'apk':         _safe2('usb',         'ApkScreen'),
-            'wireless':    _safe2('wireless',    'WirelessScreen'),
-            'devscan':     _safe2('devscan',     'DevScanScreen'),
-            'recovery':    _safe2('recovery',    'RecoveryScreen'),
-            'netscan':     _safe2('netscan',     'NetScanScreen'),
-            'malware':     _safe2('malware',     'MalwareScreen'),
-            'sysfix':      _safe2('sysfix',      'SysFixScreen'),
-            'firewall':    _safe2('firewall',    'FirewallScreen'),
-            'toolbox':     _safe2('toolbox',     'ToolboxScreen'),
-            'investigate': _safe2('investigate', 'InvestigateScreen'),
-            'auditor':     _safe2('auditor',     'AuditorScreen'),
-            'guardian':    _safe2('guardian',    'GuardianScreen'),
-            'settings':    _safe2('settings',   'SettingsScreen'),
-            'cvelookup':   _safe2('cvelookup',   'CVELookupScreen'),
-            'secureerase': _safe2('secureerase', 'SecureEraseScreen'),
-            'vpn':         _safe2('vpn',         'VPNScreen'),
-            'ids':         _safe2('ids',         'IDSScreen'),
-            'webmonitor':  _safe2('webmonitor',  'WebMonitorScreen'),
-            'daemon':      _safe2('daemon',      'DaemonScreen'),
-            'updater':     _safe2('updater',     'UpdaterScreen'),
-            'plugins':     _safe2('plugins',     'PluginScreen'),
-            'marketplace': _safe2('marketplace', 'MarketplaceScreen'),
-            'terminal':    _safe2('terminal',    'TerminalScreen'),
-        }.items() if v is not None}
+        screen_map = {
+            'dash':        _safe('dash',        'DashScreen'),
+            'perms':       _safe('perms',       'PermsScreen'),
+            'wifi':        _safe('wifi',        'WifiScreen'),
+            'calls':       _safe('calls',       'CallsScreen'),
+            'network':     _safe('network',     'NetworkScreen'),
+            'battery':     _safe('battery',     'BatteryScreen'),
+            'threats':     _safe('threats',     'ThreatsScreen'),
+            'notifs':      _safe('notifs',      'NotifsScreen'),
+            'ports':       _safe('ports',       'PortsScreen'),
+            'usb':         _safe('usb',         'UsbScreen'),
+            'apk':         _safe('usb',         'ApkScreen'),
+            'wireless':    _safe('wireless',    'WirelessScreen'),
+            'devscan':     _safe('devscan',     'DevScanScreen'),
+            'recovery':    _safe('recovery',    'RecoveryScreen'),
+            'netscan':     _safe('netscan',     'NetScanScreen'),
+            'malware':     _safe('malware',     'MalwareScreen'),
+            'sysfix':      _safe('sysfix',      'SysFixScreen'),
+            'firewall':    _safe('firewall',    'FirewallScreen'),
+            'toolbox':     _safe('toolbox',     'ToolboxScreen'),
+            'investigate': _safe('investigate', 'InvestigateScreen'),
+            'auditor':     _safe('auditor',     'AuditorScreen'),
+            'guardian':    _safe('guardian',    'GuardianScreen'),
+            'settings':    _safe('settings',    'SettingsScreen'),
+            'cvelookup':   _safe('cvelookup',   'CVELookupScreen'),
+            'secureerase': _safe('secureerase', 'SecureEraseScreen'),
+            'vpn':         _safe('vpn',         'VPNScreen'),
+            'ids':         _safe('ids',         'IDSScreen'),
+            'webmonitor':  _safe('webmonitor',  'WebMonitorScreen'),
+            'daemon':      _safe('daemon',      'DaemonScreen'),
+            'updater':     _safe('updater',     'UpdaterScreen'),
+            'plugins':     _safe('plugins',     'PluginScreen'),
+            'marketplace': _safe('marketplace', 'MarketplaceScreen'),
+            'terminal':    _safe('terminal',    'TerminalScreen'),
+        }
+        screen_map = {k: v for k, v in screen_map.items() if v is not None}
 
         # Rebuild sidebar buttons
         visible_tabs = [(k, lbl, icon) for k, lbl, icon in ALL_TABS
@@ -517,7 +522,7 @@ class MintScanApp:
         ctk.CTkFrame(self.sidebar, height=1,
                      fg_color=C['br']).pack(fill='x', side='bottom', pady=(0,8))
         ctk.CTkLabel(self.sidebar, text="MINT PROJECTS  •  PTY",
-                     font=('Courier',7), text_color=C['br2']
+                     font=(FONT,7), text_color=C['br2']
                      ).pack(side='bottom', pady=(0,4))
 
         # Re-create frames
@@ -562,15 +567,15 @@ class MintScanApp:
         for k, btn in self._tab_btns.items():
             if k == key:
                 btn.configure(
-                    fg_color=C['br'],
+                    fg_color=C['acg'],
                     text_color=C['ac'],
-                    font=('Courier', 10, 'bold')
+                    font=(FONT, 10, 'bold')
                 )
             else:
                 btn.configure(
-                    fg_color='transparent',
+                    fg_color=C['bg'],
                     text_color=C['mu'],
-                    font=('Courier', 10)
+                    font=(FONT, 10)
                 )
         self.current_tab = key
 

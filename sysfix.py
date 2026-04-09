@@ -41,7 +41,7 @@ class SysFixScreen(ctk.CTkFrame):
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="🔧  SYSTEM SCAN & FIX", font=('Courier',13,'bold'),
+        ctk.CTkLabel(hdr, text="🔧  SYSTEM SCAN & FIX", font=('DejaVu Sans Mono',13,'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         Btn(hdr, "▶ FULL SYSTEM SCAN", command=self._full_scan, width=180
             ).pack(side='right', padx=12, pady=6)
@@ -77,7 +77,7 @@ class SysFixScreen(ctk.CTkFrame):
         SectionHeader(body, '02', 'SCAN OUTPUT').pack(fill='x', padx=14, pady=(10,4))
         log_card = Card(body)
         log_card.pack(fill='x', padx=14, pady=(0,8))
-        self.scan_log = ctk.CTkTextbox(log_card, height=200, font=('Courier',10),
+        self.scan_log = ctk.CTkTextbox(log_card, height=200, font=('DejaVu Sans Mono',10),
                                         fg_color=C['bg'], text_color=C['ok'],
                                         border_width=0)
         self.scan_log.pack(fill='x', padx=8, pady=8)

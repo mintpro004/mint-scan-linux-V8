@@ -40,7 +40,7 @@ class PermsScreen(ctk.CTkFrame):
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="🔑  PERMISSIONS", font=('Courier', 13, 'bold'),
+        ctk.CTkLabel(hdr, text="🔑  PERMISSIONS", font=('DejaVu Sans Mono', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         Btn(hdr, "↺  REFRESH", command=lambda: threading.Thread(
             target=self._load, daemon=True).start(),
@@ -141,7 +141,7 @@ class PermsScreen(ctk.CTkFrame):
         # Sudo
         for w in self.sudo_frame.winfo_children(): w.destroy()
         ctk.CTkLabel(self.sudo_frame, text=r['sudo_rules'],
-                     font=('Courier', 9), text_color=C['mu'],
+                     font=('DejaVu Sans Mono', 9), text_color=C['mu'],
                      justify='left', wraplength=700).pack(anchor='w')
 
         # User

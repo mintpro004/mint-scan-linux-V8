@@ -43,7 +43,7 @@ class NetScanScreen(ctk.CTkFrame):
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="🔬  NETWORK SCANNER", font=('Courier',13,'bold'),
+        ctk.CTkLabel(hdr, text="🔬  NETWORK SCANNER", font=('DejaVu Sans Mono',13,'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
 
         btn_row = ctk.CTkFrame(hdr, fg_color='transparent')
@@ -87,20 +87,20 @@ class NetScanScreen(ctk.CTkFrame):
         # Search row
         find_row = ctk.CTkFrame(self.traffic_card, fg_color='transparent')
         find_row.pack(fill='x', padx=8, pady=(2,0))
-        ctk.CTkLabel(find_row, text="Find:", font=('Courier',9), text_color=C['mu']).pack(side='left')
-        self.find_entry = ctk.CTkEntry(find_row, width=180, font=('Courier',9),
+        ctk.CTkLabel(find_row, text="Find:", font=('DejaVu Sans Mono',9), text_color=C['mu']).pack(side='left')
+        self.find_entry = ctk.CTkEntry(find_row, width=180, font=('DejaVu Sans Mono',9),
                                         fg_color=C['bg'], border_color=C['br'],
                                         text_color=C['tx'], height=26,
                                         placeholder_text="search traffic...")
         self.find_entry.pack(side='left', padx=4)
         Btn(find_row, "↓ FIND", command=self._find_in_log, variant='ghost', width=70).pack(side='left', padx=2)
         Btn(find_row, "↑ PREV", command=lambda: self._find_in_log(reverse=True), variant='ghost', width=70).pack(side='left', padx=2)
-        self.find_count_lbl = ctk.CTkLabel(find_row, text="", font=('Courier',8), text_color=C['mu'])
+        self.find_count_lbl = ctk.CTkLabel(find_row, text="", font=('DejaVu Sans Mono',8), text_color=C['mu'])
         self.find_count_lbl.pack(side='left', padx=6)
 
         # Traffic log — always stays 'normal' so user can select, copy, paste freely
         self.traffic_log = ctk.CTkTextbox(self.traffic_card, height=220,
-                                           font=('Courier',10), fg_color=C['bg'],
+                                           font=('DejaVu Sans Mono',10), fg_color=C['bg'],
                                            text_color=C['ac'], border_width=0,
                                            wrap='none')
         self.traffic_log.pack(fill='both', padx=8, pady=(4,8))
@@ -131,7 +131,7 @@ class NetScanScreen(ctk.CTkFrame):
         ctk.CTkLabel(dpi_card, text="Analyze HTTP headers, TLS SNI, and DNS queries for hidden threats.",
                      font=MONO_SM, text_color=C['mu']).pack(pady=(12,4))
         
-        self.dpi_res = ctk.CTkTextbox(dpi_card, height=100, font=('Courier',9), fg_color=C['bg'], text_color=C['tx'], border_width=0)
+        self.dpi_res = ctk.CTkTextbox(dpi_card, height=100, font=('DejaVu Sans Mono',9), fg_color=C['bg'], text_color=C['tx'], border_width=0)
         self.dpi_res.pack(fill='x', padx=8, pady=8)
         self.dpi_res.insert('1.0', "Ready to scan.")
         self.dpi_res.configure(state='disabled')
@@ -247,14 +247,14 @@ class NetScanScreen(ctk.CTkFrame):
             row.pack(fill='x', pady=2)
             left = ctk.CTkFrame(row, fg_color='transparent')
             left.pack(side='left', padx=12, pady=8, fill='both', expand=True)
-            ctk.CTkLabel(left, text=dev['ip'], font=('Courier',11,'bold'),
+            ctk.CTkLabel(left, text=dev['ip'], font=('DejaVu Sans Mono',11,'bold'),
                          text_color=C['ac']).pack(anchor='w')
             meta = f"MAC: {dev['mac']}"
             if dev.get('vendor') and dev['vendor'] != '—':
                 meta += f"  Vendor: {dev['vendor']}"
             if dev.get('host'):
                 meta += f"  Host: {dev['host']}"
-            ctk.CTkLabel(left, text=meta, font=('Courier',8),
+            ctk.CTkLabel(left, text=meta, font=('DejaVu Sans Mono',8),
                          text_color=C['mu']).pack(anchor='w')
             # Scan ports button
             Btn(row, "SCAN PORTS",
@@ -570,16 +570,16 @@ class NetScanScreen(ctk.CTkFrame):
 
         if fixes:
             ctk.CTkLabel(self.fix_frame, text="RECOMMENDED FIXES:",
-                         font=('Courier',10,'bold'), text_color=C['ok']
+                         font=('DejaVu Sans Mono',10,'bold'), text_color=C['ok']
                          ).pack(anchor='w', pady=(4,6))
             for i, fix in enumerate(fixes, 1):
                 fix_row = ctk.CTkFrame(self.fix_frame, fg_color=C['sf'],
                                         border_color=C['ok'], border_width=1,
                                         corner_radius=6)
                 fix_row.pack(fill='x', pady=2)
-                ctk.CTkLabel(fix_row, text=f"{i}.", font=('Courier',9,'bold'),
+                ctk.CTkLabel(fix_row, text=f"{i}.", font=('DejaVu Sans Mono',9,'bold'),
                              text_color=C['ok']).pack(side='left', padx=(10,4), pady=8)
-                ctk.CTkLabel(fix_row, text=fix, font=('Courier',8),
+                ctk.CTkLabel(fix_row, text=fix, font=('DejaVu Sans Mono',8),
                              text_color=C['mu'], wraplength=600, justify='left'
                              ).pack(side='left', pady=8, padx=4)
                 # Copy button

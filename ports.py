@@ -55,7 +55,7 @@ class PortsScreen(ctk.CTkFrame):
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="🔍  PORT SCANNER", font=('Courier', 13, 'bold'),
+        ctk.CTkLabel(hdr, text="🔍  PORT SCANNER", font=('DejaVu Sans Mono', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
 
         self.scroll = ScrollableFrame(self)
@@ -95,7 +95,7 @@ class PortsScreen(ctk.CTkFrame):
         self.scan_prog.pack(fill='x', padx=12, pady=6)
         self.scan_prog.set(0)
         self.scan_prog_lbl = ctk.CTkLabel(scan_card, text="",
-                                           font=('Courier',8), text_color=C['mu'])
+                                           font=('DejaVu Sans Mono',8), text_color=C['mu'])
         self.scan_prog_lbl.pack(anchor='w', padx=12, pady=(0,4))
 
         self.remote_frame = ctk.CTkFrame(body, fg_color='transparent')
@@ -137,7 +137,7 @@ class PortsScreen(ctk.CTkFrame):
                              text_color=C['mu']).pack(side='left')
                 ctk.CTkLabel(row, text=c['remote'], font=MONO_SM,
                              text_color=C['am']).pack(side='left', padx=8)
-                ctk.CTkLabel(row, text=c['process'], font=('Courier',8),
+                ctk.CTkLabel(row, text=c['process'], font=('DejaVu Sans Mono',8),
                              text_color=C['mu']).pack(side='right', padx=8)
 
     def _remote_scan(self):
@@ -209,7 +209,7 @@ class PortsScreen(ctk.CTkFrame):
         for w in self.remote_frame.winfo_children(): w.destroy()
         ctk.CTkLabel(self.remote_frame,
                      text=f"Results for {host} (via {method}) — {len(ports)} open ports",
-                     font=('Courier', 10, 'bold'), text_color=C['ac']
+                     font=('DejaVu Sans Mono', 10, 'bold'), text_color=C['ac']
                      ).pack(anchor='w', pady=(0,6))
         if not ports:
             ResultBox(self.remote_frame, 'ok', '✓ No open ports found',
@@ -223,10 +223,10 @@ class PortsScreen(ctk.CTkFrame):
             row = ctk.CTkFrame(self.remote_frame, fg_color=C['sf'],
                                 border_color=col, border_width=1, corner_radius=6)
             row.pack(fill='x', pady=2)
-            ctk.CTkLabel(row, text=f":{port}", font=('Courier',13,'bold'),
+            ctk.CTkLabel(row, text=f":{port}", font=('DejaVu Sans Mono',13,'bold'),
                          text_color=col).pack(side='left', padx=12, pady=8)
             ctk.CTkLabel(row, text=svc, font=MONO_SM,
                          text_color=C['tx']).pack(side='left', padx=4)
             if port in KNOWN_BAD_PORTS:
-                ctk.CTkLabel(row, text="⚠ CRITICAL", font=('Courier',8),
+                ctk.CTkLabel(row, text="⚠ CRITICAL", font=('DejaVu Sans Mono',8),
                              text_color=C['wn']).pack(side='right', padx=12)

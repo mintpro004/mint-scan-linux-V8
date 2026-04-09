@@ -56,7 +56,7 @@ class WifiScreen(ctk.CTkFrame):
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="📶  WI-FI SCANNER", font=('Courier',13,'bold'),
+        ctk.CTkLabel(hdr, text="📶  WI-FI SCANNER", font=('DejaVu Sans Mono',13,'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         self.status_lbl = ctk.CTkLabel(hdr, text="Idle", font=MONO_SM, text_color=C['mu'])
         self.status_lbl.pack(side='left', padx=8)
@@ -262,17 +262,17 @@ class WifiScreen(ctk.CTkFrame):
             variant='ghost', width=120).pack(side='right', pady=(0,4))
             
         ctk.CTkLabel(self.saved_frame, text=f"{len(saved)} saved network(s):",
-                     font=('Courier',9,'bold'), text_color=C['ac']).pack(anchor='w', pady=(0,4))
+                     font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac']).pack(anchor='w', pady=(0,4))
         for net in saved[:20]:
             row = ctk.CTkFrame(self.saved_frame, fg_color=C['sf'],
                                 border_color=C['br'], border_width=1, corner_radius=8)
             row.pack(fill='x', pady=2)
-            ctk.CTkLabel(row, text='🔒', font=('Courier',16)).pack(side='left', padx=10, pady=8)
+            ctk.CTkLabel(row, text='🔒', font=('DejaVu Sans Mono',16)).pack(side='left', padx=10, pady=8)
             info = ctk.CTkFrame(row, fg_color='transparent')
             info.pack(side='left', fill='both', expand=True, pady=8)
-            ctk.CTkLabel(info, text=net['name'], font=('Courier',11,'bold'),
+            ctk.CTkLabel(info, text=net['name'], font=('DejaVu Sans Mono',11,'bold'),
                          text_color=C['tx']).pack(anchor='w')
-            ctk.CTkLabel(info, text=f"Last: {net['last']}", font=('Courier',8),
+            ctk.CTkLabel(info, text=f"Last: {net['last']}", font=('DejaVu Sans Mono',8),
                          text_color=C['mu']).pack(anchor='w')
             Btn(row, "SHOW PWD", command=lambda n=net['name']: self._show_password(n),
                 variant='ghost', width=90).pack(side='right', padx=8)
@@ -293,9 +293,9 @@ class WifiScreen(ctk.CTkFrame):
         popup.attributes('-topmost', True)
         if rc == 0 and out.strip():
             pwd = out.strip()
-            ctk.CTkLabel(popup, text=name, font=('Courier',12,'bold'),
+            ctk.CTkLabel(popup, text=name, font=('DejaVu Sans Mono',12,'bold'),
                          text_color=C['ac']).pack(pady=(12,4))
-            e = ctk.CTkEntry(popup, font=('Courier',13,'bold'),
+            e = ctk.CTkEntry(popup, font=('DejaVu Sans Mono',13,'bold'),
                              fg_color=C['s2'], border_color=C['ac'], text_color=C['ok'])
             e.pack(fill='x', padx=20, pady=8)
             e.insert(0, pwd)
@@ -338,22 +338,22 @@ class WifiScreen(ctk.CTkFrame):
                                  border_color=C['ok'] if net['ssid']==curr.strip() else col,
                                  border_width=1, corner_radius=8)
             row.pack(fill='x', pady=3)
-            ctk.CTkLabel(row, text=icon, font=('Courier',18)).pack(side='left', padx=10, pady=8)
+            ctk.CTkLabel(row, text=icon, font=('DejaVu Sans Mono',18)).pack(side='left', padx=10, pady=8)
             mid = ctk.CTkFrame(row, fg_color='transparent')
             mid.pack(side='left', fill='both', expand=True, pady=8)
             ctk.CTkLabel(mid, text=net['ssid']+('' if net['ssid']!=curr.strip() else '  ✓ CONNECTED'),
-                         font=('Courier',11,'bold'),
+                         font=('DejaVu Sans Mono',11,'bold'),
                          text_color=C['ok'] if net['ssid']==curr.strip() else C['tx']
                          ).pack(anchor='w')
             ctk.CTkLabel(mid, text=f"{sec}  ·  CH {net['channel']}  ·  {net['freq']}  ·  BSSID: {net['bssid']}",
-                         font=('Courier',8), text_color=C['mu']).pack(anchor='w')
+                         font=('DejaVu Sans Mono',8), text_color=C['mu']).pack(anchor='w')
             if sec=='OPEN':
-                ctk.CTkLabel(mid, text="⚠ No encryption", font=('Courier',8), text_color=C['wn']).pack(anchor='w')
+                ctk.CTkLabel(mid, text="⚠ No encryption", font=('DejaVu Sans Mono',8), text_color=C['wn']).pack(anchor='w')
             right = ctk.CTkFrame(row, fg_color='transparent')
             right.pack(side='right', padx=12, pady=8)
             badge = ctk.CTkFrame(right, fg_color=C['s2'], border_color=col, border_width=1, corner_radius=3)
             badge.pack(pady=(0,4))
-            ctk.CTkLabel(badge, text=sec[:8], font=('Courier',7,'bold'), text_color=col).pack(padx=6,pady=2)
+            ctk.CTkLabel(badge, text=sec[:8], font=('DejaVu Sans Mono',7,'bold'), text_color=col).pack(padx=6,pady=2)
             bars = 4 if sig>=75 else 3 if sig>=50 else 2 if sig>=25 else 1
             br = ctk.CTkFrame(right, fg_color='transparent')
             br.pack()
@@ -361,4 +361,4 @@ class WifiScreen(ctk.CTkFrame):
                 ctk.CTkFrame(br, width=5, height=(b+1)*5+3,
                              fg_color=sc if b<bars else C['br'],
                              corner_radius=1).pack(side='left', padx=1, anchor='s')
-            ctk.CTkLabel(right, text=f"{sig}%", font=('Courier',8), text_color=sc).pack()
+            ctk.CTkLabel(right, text=f"{sig}%", font=('DejaVu Sans Mono',8), text_color=sc).pack()

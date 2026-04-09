@@ -244,7 +244,7 @@ class WirelessScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text="📡  WIRELESS SYNC",
-                     font=('Courier',13,'bold'), text_color=C['ac']
+                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         self._status_dot = ctk.CTkLabel(hdr, text="● OFFLINE",
                                          font=MONO_SM, text_color=C['wn'])
@@ -274,7 +274,7 @@ class WirelessScreen(ctk.CTkFrame):
                  "STEP 3: The companion app loads instantly — battery, network, sync ready.\n\n"
                  "For USB/ADB connection (Android 16+), use the USB Sync tab instead.\n"
                  "Both phone and Chromebook must be on the SAME Wi-Fi network.",
-            font=('Courier',10), text_color=C['tx'], justify='left'
+            font=('DejaVu Sans Mono',10), text_color=C['tx'], justify='left'
         ).pack(anchor='w', padx=12, pady=(10,10))
 
         # ── Server connection info ────────────────────────────────
@@ -300,7 +300,7 @@ class WirelessScreen(ctk.CTkFrame):
         self._port_entry.insert(0, str(self._port))
         ctk.CTkLabel(port_row,
             text="(default 8765 — change if blocked by firewall)",
-            font=('Courier',8), text_color=C['mu']).pack(side='left')
+            font=('DejaVu Sans Mono',8), text_color=C['mu']).pack(side='left')
 
         # ── QR / URL ──────────────────────────────────────────────
         SectionHeader(body, '03', 'PHONE CONNECTION').pack(fill='x', padx=14, pady=(10,4))
@@ -324,7 +324,7 @@ class WirelessScreen(ctk.CTkFrame):
         comp_card.pack(fill='x', padx=14, pady=(0,8))
         ctk.CTkLabel(comp_card,
             text="📱  HOW TO OPEN ON YOUR PHONE:",
-            font=('Courier',11,'bold'), text_color=C['ac']
+            font=('DejaVu Sans Mono',11,'bold'), text_color=C['ac']
         ).pack(anchor='w', padx=12, pady=(12,4))
         ctk.CTkLabel(comp_card,
             text="Method A — Browser (Wi-Fi):\n"
@@ -335,7 +335,7 @@ class WirelessScreen(ctk.CTkFrame):
                  "  1. Connect phone via USB with USB Debugging enabled\n"
                  "  2. Go to USB Sync tab → tap 🚀 OPEN COMPANION ON PHONE\n"
                  "  3. Served via ADB port-forward — bypasses all file restrictions",
-            font=('Courier',9), text_color=C['tx'], justify='left'
+            font=('DejaVu Sans Mono',9), text_color=C['tx'], justify='left'
         ).pack(anchor='w', padx=12, pady=(0,12))
 
         # ── Sync log ──────────────────────────────────────────────
@@ -343,7 +343,7 @@ class WirelessScreen(ctk.CTkFrame):
         log_card = Card(body)
         log_card.pack(fill='x', padx=14, pady=(0,14))
         self._log = ctk.CTkTextbox(log_card, height=160,
-                                    font=('Courier',9),
+                                    font=('DejaVu Sans Mono',9),
                                     fg_color=C['bg'],
                                     text_color=C['ok'],
                                     border_width=0)
@@ -418,16 +418,16 @@ class WirelessScreen(ctk.CTkFrame):
             for w in self._phone_card.winfo_children(): w.destroy()
             ctk.CTkLabel(self._phone_card,
                 text="OPEN THIS URL ON YOUR PHONE'S BROWSER:",
-                font=('Courier',9,'bold'), text_color=C['mu']
+                font=('DejaVu Sans Mono',9,'bold'), text_color=C['mu']
             ).pack(anchor='w', padx=12, pady=(12,4))
             url_lbl = ctk.CTkLabel(self._phone_card,
                 text=f"  {url}",
-                font=('Courier',16,'bold'), text_color=C['ac'])
+                font=('DejaVu Sans Mono',16,'bold'), text_color=C['ac'])
             url_lbl.pack(anchor='w', padx=12, pady=(0,4))
             ctk.CTkLabel(self._phone_card,
                 text=f"Your phone and Chromebook must be on the same Wi-Fi network.\n"
                      f"The URL opens a dashboard where you can check server status.",
-                font=('Courier',9), text_color=C['mu'], justify='left'
+                font=('DejaVu Sans Mono',9), text_color=C['mu'], justify='left'
             ).pack(anchor='w', padx=12, pady=(0,12))
 
     def _poll_data(self):
@@ -470,7 +470,7 @@ class WirelessScreen(ctk.CTkFrame):
         if calls:
             ctk.CTkLabel(self._data_frame,
                 text=f"Recent calls ({len(calls)}):",
-                font=('Courier',9,'bold'), text_color=C['ac']
+                font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac']
             ).pack(anchor='w', pady=(4,2))
             for call in calls[:5]:
                 num  = call.get('number','Unknown')
@@ -485,7 +485,7 @@ class WirelessScreen(ctk.CTkFrame):
         if sms:
             ctk.CTkLabel(self._data_frame,
                 text=f"\nRecent messages ({len(sms)}):",
-                font=('Courier',9,'bold'), text_color=C['ac']
+                font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac']
             ).pack(anchor='w', pady=(8,2))
             for msg in sms[:3]:
                 addr = msg.get('address','?')

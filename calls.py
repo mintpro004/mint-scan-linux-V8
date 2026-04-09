@@ -83,7 +83,7 @@ class CallsScreen(ctk.CTkFrame):
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
-        ctk.CTkLabel(hdr, text="📞  CALL LOG", font=('Courier', 13, 'bold'),
+        ctk.CTkLabel(hdr, text="📞  CALL LOG", font=('DejaVu Sans Mono', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
         Btn(hdr, "↺  RELOAD", command=lambda: threading.Thread(
             target=self._load, daemon=True).start(),
@@ -99,7 +99,7 @@ class CallsScreen(ctk.CTkFrame):
         info_card.pack(fill='x', padx=14, pady=(0,8))
         ctk.CTkLabel(info_card,
                      text="Linux Call Log Sources",
-                     font=('Courier', 10, 'bold'), text_color=C['bl']
+                     font=('DejaVu Sans Mono', 10, 'bold'), text_color=C['bl']
                      ).pack(anchor='w', padx=12, pady=(10,2))
         ctk.CTkLabel(info_card,
                      text="On Linux, call logs are available from:\n"
@@ -180,27 +180,27 @@ class CallsScreen(ctk.CTkFrame):
                             border_color=C['wn'] if risk == 'HIGH' else C['br'],
                             border_width=1, corner_radius=8)
         row.pack(fill='x', pady=3)
-        ctk.CTkLabel(row, text=icon, font=('Courier', 18)).pack(side='left', padx=12, pady=8)
+        ctk.CTkLabel(row, text=icon, font=('DejaVu Sans Mono', 18)).pack(side='left', padx=12, pady=8)
 
         mid = ctk.CTkFrame(row, fg_color='transparent')
         mid.pack(side='left', fill='both', expand=True, pady=8)
-        ctk.CTkLabel(mid, text=num, font=('Courier', 11, 'bold'),
+        ctk.CTkLabel(mid, text=num, font=('DejaVu Sans Mono', 11, 'bold'),
                      text_color=rcolor if risk == 'HIGH' else C['tx']).pack(anchor='w')
         meta = f"{direction}  ·  Duration: {call.get('duration','—')}  ·  {call.get('date','')}"
-        ctk.CTkLabel(mid, text=meta, font=('Courier', 8),
+        ctk.CTkLabel(mid, text=meta, font=('DejaVu Sans Mono', 8),
                      text_color=C['mu']).pack(anchor='w')
         if analysis.get('operator'):
             ctk.CTkLabel(mid, text=f"Operator: {analysis['operator']}",
-                         font=('Courier', 8), text_color=C['ac']).pack(anchor='w')
+                         font=('DejaVu Sans Mono', 8), text_color=C['ac']).pack(anchor='w')
         for reason in analysis.get('reasons', []):
-            ctk.CTkLabel(mid, text=f"⚠ {reason}", font=('Courier', 8),
+            ctk.CTkLabel(mid, text=f"⚠ {reason}", font=('DejaVu Sans Mono', 8),
                          text_color=C['wn']).pack(anchor='w')
 
         if risk != 'LOW':
             badge = ctk.CTkFrame(row, fg_color=rcolor,
                                   border_color=rcolor, border_width=1, corner_radius=3)
             badge.pack(side='right', padx=12)
-            ctk.CTkLabel(badge, text=risk, font=('Courier', 7, 'bold'),
+            ctk.CTkLabel(badge, text=risk, font=('DejaVu Sans Mono', 7, 'bold'),
                          text_color=rcolor).pack(padx=6, pady=2)
 
     def _check_number(self):

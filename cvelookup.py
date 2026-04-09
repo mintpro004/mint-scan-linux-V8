@@ -106,7 +106,7 @@ class CVELookupScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text='🔍  CVE VULNERABILITY LOOKUP',
-                     font=('Courier', 13, 'bold'),
+                     font=('DejaVu Sans Mono', 13, 'bold'),
                      text_color=C['ac']).pack(side='left', padx=16)
 
         body = ScrollableFrame(self)
@@ -121,7 +121,7 @@ class CVELookupScreen(ctk.CTkFrame):
         sr.pack(fill='x', padx=12, pady=12)
         self._q = ctk.CTkEntry(
             sr, placeholder_text='service + version, e.g. "openssh 8.9" or "apache 2.4"',
-            font=('Courier', 10), fg_color=C['bg'],
+            font=('DejaVu Sans Mono', 10), fg_color=C['bg'],
             border_color=C['br'], text_color=C['tx'], height=34)
         self._q.pack(side='left', fill='x', expand=True, padx=(0, 8))
         Btn(sr, '🔍 SEARCH', command=self._search,
@@ -199,7 +199,7 @@ class CVELookupScreen(ctk.CTkFrame):
             return
         ctk.CTkLabel(self._res_frame,
             text=f'{len(results)} CVE(s) for "{query}"',
-            font=('Courier', 10, 'bold'),
+            font=('DejaVu Sans Mono', 10, 'bold'),
             text_color=C['ac']).pack(anchor='w', pady=(4, 6))
         for cve in results:
             col = severity_color(cve['severity'])
@@ -210,18 +210,18 @@ class CVELookupScreen(ctk.CTkFrame):
             hr = ctk.CTkFrame(card, fg_color='transparent')
             hr.pack(fill='x', padx=10, pady=(8, 2))
             ctk.CTkLabel(hr, text=cve['id'],
-                font=('Courier', 11, 'bold'), text_color=col
+                font=('DejaVu Sans Mono', 11, 'bold'), text_color=col
                 ).pack(side='left')
             ctk.CTkLabel(hr,
                 text=f"CVSS {cve['cvss']}  [{cve['severity']}]  {cve['published']}",
-                font=('Courier', 8), text_color=C['mu']
+                font=('DejaVu Sans Mono', 8), text_color=C['mu']
                 ).pack(side='right')
             ctk.CTkLabel(card, text=cve['description'],
-                font=('Courier', 9), text_color=C['tx'],
+                font=('DejaVu Sans Mono', 9), text_color=C['tx'],
                 wraplength=700, justify='left'
                 ).pack(anchor='w', padx=10, pady=(0, 4))
             ctk.CTkLabel(card, text=cve['url'],
-                font=('Courier', 8), text_color=C['bl'],
+                font=('DejaVu Sans Mono', 8), text_color=C['bl'],
                 cursor='hand2'
                 ).pack(anchor='w', padx=10, pady=(0, 8))
 

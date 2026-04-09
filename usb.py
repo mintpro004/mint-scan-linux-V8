@@ -109,7 +109,7 @@ class UsbScreen(ctk.CTkFrame):
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text="📱  PHONE MANAGER",
-                     font=('Courier',13,'bold'), text_color=C['ac']
+                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         self.dev_lbl = ctk.CTkLabel(hdr, text="● Detecting...",
                                      font=MONO_SM, text_color=C['mu'])
@@ -143,7 +143,7 @@ class UsbScreen(ctk.CTkFrame):
                  "  2.  Settings → Developer Options → USB Debugging → ON\n"
                  "  3.  Connect USB cable to Chromebook\n"
                  "  4.  Phone shows Allow USB Debugging? → tap ALLOW",
-            font=('Courier',8), text_color=C['mu'], justify='left'
+            font=('DejaVu Sans Mono',8), text_color=C['mu'], justify='left'
         ).pack(anchor='w', padx=12, pady=(4,10))
 
         # ── 02 Device status ──────────────────────────────────
@@ -164,20 +164,20 @@ class UsbScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(comp,
             text="📱  COMPANION — HTTP SERVER (USB)",
-            font=('Courier',11,'bold'), text_color=C['ac']
+            font=('DejaVu Sans Mono',11,'bold'), text_color=C['ac']
         ).pack(anchor='w', padx=12, pady=(12,4))
 
         ctk.CTkLabel(comp,
             text="Starts a local HTTP server and opens the companion\n"
                  "on your phone via ADB port-forward over the USB cable.\n"
                  "Works on ALL Android versions — no file:// error.",
-            font=('Courier',8), text_color=C['mu'], justify='left'
+            font=('DejaVu Sans Mono',8), text_color=C['mu'], justify='left'
         ).pack(anchor='w', padx=12, pady=(0,8))
 
         # THE button — starts HTTP server + ADB forward + opens on phone
         self.comp_btn = ctk.CTkButton(comp,
             text="🚀  OPEN COMPANION ON PHONE (USB)",
-            font=('Courier',11,'bold'),
+            font=('DejaVu Sans Mono',11,'bold'),
             height=48,
             fg_color=C['ac'],
             hover_color=C['br2'],
@@ -230,7 +230,7 @@ class UsbScreen(ctk.CTkFrame):
         for var, lbl in [(self.opt_replace,'Replace existing (-r)'),
                          (self.opt_grant,  'Grant all permissions (-g)')]:
             ctk.CTkCheckBox(opts_row, text=lbl, variable=var,
-                            font=('Courier',8), text_color=C['tx'],
+                            font=('DejaVu Sans Mono',8), text_color=C['tx'],
                             fg_color=C['ac'], checkmark_color=C['bg'],
                             border_color=C['br'], hover_color=C['br2']
                             ).pack(side='left', padx=(0,16))
@@ -274,7 +274,7 @@ class UsbScreen(ctk.CTkFrame):
 
         # ── 07 Output log ─────────────────────────────────────
         SectionHeader(body,'07','OUTPUT').pack(fill='x', padx=14, pady=(10,4))
-        self.output = ctk.CTkTextbox(body, height=160, font=('Courier',10),
+        self.output = ctk.CTkTextbox(body, height=160, font=('DejaVu Sans Mono',10),
                                       fg_color=C['s2'], text_color=C['ok'],
                                       border_color=C['br'], border_width=1,
                                       corner_radius=6)

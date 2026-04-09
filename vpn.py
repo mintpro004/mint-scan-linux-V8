@@ -127,7 +127,7 @@ class VPNScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x'); hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text='🔒  VPN CLIENT',
-                     font=('Courier', 13, 'bold'), text_color=C['ac']
+                     font=('DejaVu Sans Mono', 13, 'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         Btn(hdr, '↺ REFRESH', command=lambda: threading.Thread(
             target=self._bg_refresh, daemon=True).start(),
@@ -141,13 +141,13 @@ class VPNScreen(ctk.CTkFrame):
         self._sc = Card(body)
         self._sc.pack(fill='x', padx=14, pady=(0,8))
         self._stat_lbl = ctk.CTkLabel(self._sc, text='Checking...',
-                                       font=('Courier',13,'bold'), text_color=C['mu'])
+                                       font=('DejaVu Sans Mono',13,'bold'), text_color=C['mu'])
         self._stat_lbl.pack(pady=(12,4))
         self._stat_info = ctk.CTkLabel(self._sc, text='',
                                         font=MONO_SM, text_color=C['mu'])
         self._stat_info.pack(pady=(0,4))
         self._tool_lbl = ctk.CTkLabel(self._sc, text='',
-                                       font=('Courier',8), text_color=C['mu'])
+                                       font=('DejaVu Sans Mono',8), text_color=C['mu'])
         self._tool_lbl.pack(pady=(0,10))
 
         # ── WIREGUARD ──────────────────────────────────────────
@@ -160,7 +160,7 @@ class VPNScreen(ctk.CTkFrame):
         self._wg_menu = ctk.CTkOptionMenu(
             wg, variable=self._wg_var, values=[NONE_LABEL],
             fg_color=C['s2'], button_color=C['br2'],
-            dropdown_fg_color=C['sf'], text_color=C['tx'], font=('Courier',9),
+            dropdown_fg_color=C['sf'], text_color=C['tx'], font=('DejaVu Sans Mono',9),
             dynamic_resizing=False)
         self._wg_menu.pack(fill='x', padx=12, pady=4)
 
@@ -176,7 +176,7 @@ class VPNScreen(ctk.CTkFrame):
         ctk.CTkLabel(wg,
             text='No .conf? Place WireGuard .conf file in:\n'
                  '  /etc/wireguard/wg0.conf   OR   ~/vpn/myvpn.conf',
-            font=('Courier',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,10))
+            font=('DejaVu Sans Mono',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,10))
 
         # ── OPENVPN ────────────────────────────────────────────
         SectionHeader(body, '03', 'OPENVPN').pack(fill='x', padx=14, pady=(8,4))
@@ -188,7 +188,7 @@ class VPNScreen(ctk.CTkFrame):
         self._ov_menu = ctk.CTkOptionMenu(
             ov, variable=self._ov_var, values=[NONE_LABEL],
             fg_color=C['s2'], button_color=C['br2'],
-            dropdown_fg_color=C['sf'], text_color=C['tx'], font=('Courier',9),
+            dropdown_fg_color=C['sf'], text_color=C['tx'], font=('DejaVu Sans Mono',9),
             dynamic_resizing=False)
         self._ov_menu.pack(fill='x', padx=12, pady=4)
 
@@ -202,7 +202,7 @@ class VPNScreen(ctk.CTkFrame):
 
         ctk.CTkLabel(ov,
             text='No .ovpn? Download from your VPN provider and place in ~/vpn/',
-            font=('Courier',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,10))
+            font=('DejaVu Sans Mono',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,10))
 
         # ── NETWORKMANAGER VPN ─────────────────────────────────
         SectionHeader(body, '04', 'NETWORKMANAGER VPN').pack(fill='x', padx=14, pady=(8,4))
@@ -214,7 +214,7 @@ class VPNScreen(ctk.CTkFrame):
         self._nm_menu = ctk.CTkOptionMenu(
             nm, variable=self._nm_var, values=[NONE_LABEL],
             fg_color=C['s2'], button_color=C['br2'],
-            dropdown_fg_color=C['sf'], text_color=C['tx'], font=('Courier',9),
+            dropdown_fg_color=C['sf'], text_color=C['tx'], font=('DejaVu Sans Mono',9),
             dynamic_resizing=False)
         self._nm_menu.pack(fill='x', padx=12, pady=4)
         br3 = ctk.CTkFrame(nm, fg_color='transparent')
@@ -226,7 +226,7 @@ class VPNScreen(ctk.CTkFrame):
         SectionHeader(body, '05', 'VPN LOG').pack(fill='x', padx=14, pady=(8,4))
         lc = Card(body)
         lc.pack(fill='x', padx=14, pady=(0,14))
-        self._log_box = ctk.CTkTextbox(lc, height=130, font=('Courier',9),
+        self._log_box = ctk.CTkTextbox(lc, height=130, font=('DejaVu Sans Mono',9),
                                         fg_color=C['bg'], text_color=C['ok'], border_width=0)
         self._log_box.pack(fill='x', padx=8, pady=8)
         self._log_box.configure(state='normal')
@@ -332,7 +332,7 @@ class VPNScreen(ctk.CTkFrame):
             out, err, rc = run_cmd(f'sudo wg-quick up {iface}', timeout=25)
             msg = out or err or f'Exit code: {rc}'
             self._safe_after(0, self._ulog, ('✓ ' if rc==0 else '✗ ') + msg[:120])
-            self._safe_after(500, threading.Thread(target=self._bg_refresh, daemon=True).start)
+            self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
         threading.Thread(target=_bg, daemon=True).start()
 
     def _wg_down(self):
@@ -371,13 +371,16 @@ class VPNScreen(ctk.CTkFrame):
         threading.Thread(target=_bg, daemon=True).start()
 
     def _ov_disconnect(self):
-        run_cmd('sudo killall openvpn 2>/dev/null')
-        if self._ov_proc:
-            try: self._ov_proc.terminate()
-            except Exception: pass
-            self._ov_proc = None
-        self._ulog('OpenVPN terminated')
-        threading.Thread(target=self._bg_refresh, daemon=True).start()
+        self._ulog('Disconnecting OpenVPN...')
+        def _bg():
+            if self._ov_proc:
+                try: self._ov_proc.terminate()
+                except Exception: pass
+                self._ov_proc = None
+            run_cmd('sudo killall openvpn 2>/dev/null', timeout=10)
+            self._safe_after(0, self._ulog, 'OpenVPN terminated')
+            self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
+        threading.Thread(target=_bg, daemon=True).start()
 
     def _nm_connect(self):
         name = self._nm_var.get()
@@ -394,9 +397,12 @@ class VPNScreen(ctk.CTkFrame):
     def _nm_disconnect(self):
         name = self._nm_var.get()
         if name == NONE_LABEL: return
-        run_cmd(f'nmcli con down "{name}"', timeout=15)
-        self._ulog(f'NM VPN disconnected: {name}')
-        threading.Thread(target=self._bg_refresh, daemon=True).start()
+        self._ulog(f'Disconnecting NM VPN: {name}')
+        def _bg():
+            run_cmd(f'nmcli con down "{name}"', timeout=15)
+            self._safe_after(0, self._ulog, f'NM VPN disconnected: {name}')
+            self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
+        threading.Thread(target=_bg, daemon=True).start()
 
     def _install(self, pkg):
         from installer import InstallerPopup

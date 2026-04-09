@@ -72,7 +72,7 @@ class SettingsScreen(ctk.CTkFrame):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
         ctk.CTkLabel(hdr, text="⚙  SETTINGS",
-                     font=('Courier',13,'bold'), text_color=C['ac']
+                     font=('DejaVu Sans Mono',13,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         Btn(hdr, "💾 SAVE & APPLY", command=self._save,
             variant='success', width=160).pack(side='right', padx=12, pady=6)
@@ -91,7 +91,7 @@ class SettingsScreen(ctk.CTkFrame):
         theme_row = ctk.CTkFrame(theme_card, fg_color='transparent')
         theme_row.pack(fill='x', padx=12, pady=(12,8))
         ctk.CTkLabel(theme_row, text="COLOUR THEME",
-                     font=('Courier',9,'bold'), text_color=C['ac'],
+                     font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac'],
                      width=150).pack(side='left')
 
         self._theme_var = tk.StringVar(value=self.settings.get('theme','dark'))
@@ -99,7 +99,7 @@ class SettingsScreen(ctk.CTkFrame):
         # Dark button
         self._dark_btn = ctk.CTkButton(theme_row,
             text="🌙  DARK",
-            font=('Courier',10,'bold'),
+            font=('DejaVu Sans Mono',10,'bold'),
             width=140, height=40,
             fg_color=C['br2'],
             border_color=C['ac'],
@@ -112,7 +112,7 @@ class SettingsScreen(ctk.CTkFrame):
         # Light button
         self._light_btn = ctk.CTkButton(theme_row,
             text="☀  LIGHT",
-            font=('Courier',10,'bold'),
+            font=('DejaVu Sans Mono',10,'bold'),
             width=140, height=40,
             fg_color='#e2e8f0',
             border_color='#94a3b8',
@@ -135,7 +135,7 @@ class SettingsScreen(ctk.CTkFrame):
         acc_row = ctk.CTkFrame(accent_card, fg_color='transparent')
         acc_row.pack(fill='x', padx=12, pady=(10,10))
         ctk.CTkLabel(acc_row, text="ACCENT",
-                     font=('Courier',9,'bold'), text_color=C['ac'],
+                     font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac'],
                      width=80).pack(side='left')
 
         self._accent_var = tk.StringVar(value=self.settings.get('accent_color','#00ffe0'))
@@ -150,7 +150,7 @@ class SettingsScreen(ctk.CTkFrame):
                 fg_color=hex_col,
                 hover_color=hex_col,
                 text_color='#000000',
-                font=('Courier',8,'bold'),
+                font=('DejaVu Sans Mono',8,'bold'),
                 corner_radius=4,
                 border_width=2,
                 border_color=hex_col,
@@ -159,7 +159,7 @@ class SettingsScreen(ctk.CTkFrame):
 
         self._accent_preview = ctk.CTkLabel(accent_card,
             text="● Selected: #00ffe0",
-            font=('Courier',9), text_color=C['ac'])
+            font=('DejaVu Sans Mono',9), text_color=C['ac'])
         self._accent_preview.pack(anchor='w', padx=12, pady=(0,8))
 
         # ── FONT SIZE ─────────────────────────────────────────
@@ -170,7 +170,7 @@ class SettingsScreen(ctk.CTkFrame):
         font_row = ctk.CTkFrame(font_card, fg_color='transparent')
         font_row.pack(fill='x', padx=12, pady=(10,4))
         ctk.CTkLabel(font_row, text="SIZE",
-                     font=('Courier',9,'bold'), text_color=C['ac'],
+                     font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac'],
                      width=80).pack(side='left')
         self.font_lbl = ctk.CTkLabel(font_row, text="10px",
                                       font=MONO_SM, text_color=C['tx'], width=40)
@@ -182,7 +182,7 @@ class SettingsScreen(ctk.CTkFrame):
                                           fg_color=C['br'])
         self.font_slider.pack(side='left', fill='x', expand=True, padx=8)
         ctk.CTkLabel(font_card, text="Adjusts text size — restart fully applies",
-                     font=('Courier',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,4))
+                     font=('DejaVu Sans Mono',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,4))
 
         # ── UI SCALE ──────────────────────────────────────────
         SectionHeader(body, '04', 'UI SCALE').pack(fill='x', padx=14, pady=(8,4))
@@ -192,7 +192,7 @@ class SettingsScreen(ctk.CTkFrame):
         scale_row = ctk.CTkFrame(scale_card, fg_color='transparent')
         scale_row.pack(fill='x', padx=12, pady=(10,4))
         ctk.CTkLabel(scale_row, text="SCALE",
-                     font=('Courier',9,'bold'), text_color=C['ac'],
+                     font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac'],
                      width=80).pack(side='left')
         self.scale_lbl = ctk.CTkLabel(scale_row, text="100%",
                                        font=MONO_SM, text_color=C['tx'], width=45)
@@ -205,7 +205,7 @@ class SettingsScreen(ctk.CTkFrame):
         self.scale_slider.pack(side='left', fill='x', expand=True, padx=8)
         ctk.CTkLabel(scale_card,
                      text="Makes all interface elements larger or smaller (restart to apply fully)",
-                     font=('Courier',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,10))
+                     font=('DejaVu Sans Mono',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,10))
 
         # ── PERFORMANCE ───────────────────────────────────────
         SectionHeader(body, '05', 'PERFORMANCE').pack(fill='x', padx=14, pady=(8,4))
@@ -215,7 +215,7 @@ class SettingsScreen(ctk.CTkFrame):
         ping_row = ctk.CTkFrame(perf, fg_color='transparent')
         ping_row.pack(fill='x', padx=12, pady=(10,4))
         ctk.CTkLabel(ping_row, text="PING INTERVAL",
-                     font=('Courier',9,'bold'), text_color=C['ac'],
+                     font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac'],
                      width=140).pack(side='left')
         self.ping_lbl = ctk.CTkLabel(ping_row, text="3s",
                                       font=MONO_SM, text_color=C['tx'], width=35)
@@ -227,12 +227,12 @@ class SettingsScreen(ctk.CTkFrame):
                                           fg_color=C['br'])
         self.ping_slider.pack(side='left', fill='x', expand=True, padx=8)
         ctk.CTkLabel(perf, text="How often the network graph refreshes",
-                     font=('Courier',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,4))
+                     font=('DejaVu Sans Mono',8), text_color=C['mu']).pack(anchor='w', padx=12, pady=(0,4))
 
         sw_row = ctk.CTkFrame(perf, fg_color='transparent')
         sw_row.pack(fill='x', padx=12, pady=(4,10))
         ctk.CTkLabel(sw_row, text="AUTO-SCAN ON START",
-                     font=('Courier',9,'bold'), text_color=C['ac'],
+                     font=('DejaVu Sans Mono',9,'bold'), text_color=C['ac'],
                      width=200).pack(side='left')
         self.scan_start_var = ctk.BooleanVar(value=True)
         ctk.CTkSwitch(sw_row, text='', variable=self.scan_start_var,
@@ -240,7 +240,7 @@ class SettingsScreen(ctk.CTkFrame):
                       button_color=C['ac'],
                       progress_color=C['br2']).pack(side='left', padx=8)
         ctk.CTkLabel(sw_row, text="Load dashboard data on launch",
-                     font=('Courier',8), text_color=C['mu']).pack(side='left')
+                     font=('DejaVu Sans Mono',8), text_color=C['mu']).pack(side='left')
 
         # ── SYSTEM TWEAKS ─────────────────────────────────────
         SectionHeader(body, '06', 'SYSTEM TWEAKS').pack(fill='x', padx=14, pady=(8,4))
@@ -271,15 +271,15 @@ class SettingsScreen(ctk.CTkFrame):
         self.preview.pack(fill='x', padx=14, pady=(0,8))
         self.prev_title = ctk.CTkLabel(self.preview,
             text="[ MINT SCAN ]",
-            font=('Courier',14,'bold'), text_color=C['ac'])
+            font=('DejaVu Sans Mono',14,'bold'), text_color=C['ac'])
         self.prev_title.pack(anchor='w', padx=12, pady=(10,4))
         self.prev_body = ctk.CTkLabel(self.preview,
             text="Sample text — this shows your font size setting.",
-            font=('Courier',10), text_color=C['tx'])
+            font=('DejaVu Sans Mono',10), text_color=C['tx'])
         self.prev_body.pack(anchor='w', padx=12, pady=(0,4))
         self.prev_sub = ctk.CTkLabel(self.preview,
             text="Status bar text — secondary information",
-            font=('Courier',9), text_color=C['mu'])
+            font=('DejaVu Sans Mono',9), text_color=C['mu'])
         self.prev_sub.pack(anchor='w', padx=12, pady=(0,10))
 
         self.status_lbl = ctk.CTkLabel(body, text="",
@@ -316,9 +316,9 @@ class SettingsScreen(ctk.CTkFrame):
     def _on_font_change(self, val):
         size = int(val)
         self.font_lbl.configure(text=f"{size}px")
-        self.prev_title.configure(font=('Courier', size+4, 'bold'))
-        self.prev_body.configure(font=('Courier', size))
-        self.prev_sub.configure(font=('Courier', max(8, size-1)))
+        self.prev_title.configure(font=('DejaVu Sans Mono', size+4, 'bold'))
+        self.prev_body.configure(font=('DejaVu Sans Mono', size))
+        self.prev_sub.configure(font=('DejaVu Sans Mono', max(8, size-1)))
 
     def _on_scale_change(self, val):
         self.scale_lbl.configure(text=f"{int(float(val)*100)}%")

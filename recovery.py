@@ -54,7 +54,7 @@ class RecoveryScreen(ctk.CTkFrame):
         hdr.pack(fill='x')
         hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text="🗃  DATA RECOVERY — PHONE & DEVICES",
-                     font=('Courier',12,'bold'), text_color=C['ac']
+                     font=('DejaVu Sans Mono',12,'bold'), text_color=C['ac']
                      ).pack(side='left', padx=16)
         Btn(hdr, "↺ RESCAN", command=lambda: threading.Thread(
             target=self._detect_device, daemon=True).start(),
@@ -83,7 +83,7 @@ class RecoveryScreen(ctk.CTkFrame):
                      text_color=C['mu']).pack(side='left', padx=(0,8))
         self.out_entry = ctk.CTkEntry(out_row,
             placeholder_text=self._out_dir,
-            font=('Courier',9), fg_color=C['bg'],
+            font=('DejaVu Sans Mono',9), fg_color=C['bg'],
             border_color=C['br'], text_color=C['tx'], height=32)
         self.out_entry.pack(side='left', fill='x', expand=True, padx=(0,8))
         self.out_entry.insert(0, self._out_dir)
@@ -127,7 +127,7 @@ class RecoveryScreen(ctk.CTkFrame):
         for i, (key, lbl) in enumerate(items):
             r, c = divmod(i, 2)
             ctk.CTkCheckBox(grid, text=lbl, variable=self.categories[key],
-                font=('Courier',9), text_color=C['tx'],
+                font=('DejaVu Sans Mono',9), text_color=C['tx'],
                 fg_color=C['ac'], checkmark_color=C['bg'],
                 border_color=C['br'], hover_color=C['br2']
             ).grid(row=r, column=c, padx=10, pady=4, sticky='w')
@@ -164,7 +164,7 @@ class RecoveryScreen(ctk.CTkFrame):
         # Full recovery button
         self.recover_all_btn = ctk.CTkButton(quick_card,
             text="🗃  RECOVER EVERYTHING (ALL SELECTED)",
-            font=('Courier',11,'bold'), height=46,
+            font=('DejaVu Sans Mono',11,'bold'), height=46,
             fg_color=C['ac'], hover_color=C['br2'],
             text_color=C['bg'], corner_radius=8,
             command=self._recover_all)
@@ -202,7 +202,7 @@ class RecoveryScreen(ctk.CTkFrame):
             variant='ghost', width=80).pack(side='right', padx=4)
 
         self.log_box = ctk.CTkTextbox(log_card, height=160,
-            font=('Courier',9), fg_color=C['bg'],
+            font=('DejaVu Sans Mono',9), fg_color=C['bg'],
             text_color=C['ok'], border_width=0)
         self.log_box.pack(fill='x', padx=8, pady=8)
 
@@ -881,13 +881,13 @@ class RecoveryScreen(ctk.CTkFrame):
                                border_color=C['ok'], border_width=1, corner_radius=6)
             row.pack(fill='x', pady=2)
             ctk.CTkLabel(row, text=label,
-                         font=('Courier',10,'bold'), text_color=C['ok']
+                         font=('DejaVu Sans Mono',10,'bold'), text_color=C['ok']
                          ).pack(side='left', padx=12, pady=8)
             ctk.CTkLabel(row, text=f"{count} items",
                          font=MONO_SM, text_color=C['ac']
                          ).pack(side='left', padx=4)
             ctk.CTkLabel(row, text=os.path.basename(str(path)),
-                         font=('Courier',8), text_color=C['mu']
+                         font=('DejaVu Sans Mono',8), text_color=C['mu']
                          ).pack(side='left', padx=8)
             Btn(row, "📂 OPEN",
                 command=lambda p=str(path): self._open_path(p),
