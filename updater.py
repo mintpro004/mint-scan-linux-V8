@@ -123,8 +123,8 @@ def do_git_update(log_fn=None):
         return False
 
     _l('Fixing ownership...')
-    from utils import run_cmd as _rc
-    _rc(f'sudo chown -R $USER:$USER "{BASE_DIR}"', timeout=15)
+    subprocess.run(f'sudo chown -R $USER:$USER "{BASE_DIR}"',
+                   shell=True, capture_output=True)
 
     _l('Fetching from GitHub...')
     r = subprocess.run('git fetch origin', shell=True,

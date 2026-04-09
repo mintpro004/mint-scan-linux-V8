@@ -280,7 +280,7 @@ class IDSScreen(ctk.CTkFrame):
                 text='Snort not installed',
                 font=MONO_SM, text_color=C['mu']).pack(anchor='w', pady=(0,6))
             Btn(self._snort_content, '⬇ INSTALL SNORT',
-                command=lambda: self._install('snort', 'snort'),
+                command=self._install_snort,
                 variant='blue', width=180).pack(anchor='w')
 
         self._load_alerts()
@@ -354,8 +354,12 @@ class IDSScreen(ctk.CTkFrame):
         threading.Thread(target=_bg, daemon=True).start()
 
     def _stop_suricata(self):
-        run_cmd('sudo killall suricata 2>/dev/null')
-        run_cmd('sudo rm -f /var/run/suricata.pid')
+        def _bg():
+            run_cmd('sudo killall suricata 2>/dev/null', timeout=10)
+            run_cmd('sudo rm -f /var/run/suricata.pid', timeout=5)
+            self.after(500, lambda: threading.Thread(
+                target=self._bg_refresh, daemon=True).start())
+        threading.Thread(target=_bg, daemon=True).start()
         threading.Thread(target=self._bg_refresh, daemon=True).start()
 
     def _update_suricata_rules(self):
@@ -383,7 +387,11 @@ class IDSScreen(ctk.CTkFrame):
         threading.Thread(target=_bg, daemon=True).start()
 
     def _stop_snort(self):
-        run_cmd('sudo killall snort 2>/dev/null')
+        def _bg():
+            run_cmd('sudo killall snort 2>/dev/null', timeout=10)
+            self.after(500, lambda: threading.Thread(
+                target=self._bg_refresh, daemon=True).start())
+        threading.Thread(target=_bg, daemon=True).start()
         threading.Thread(target=self._bg_refresh, daemon=True).start()
 
     def _test_rule(self):
@@ -405,38 +413,34 @@ class IDSScreen(ctk.CTkFrame):
                 'text_color': C['ok'] if ok else C['wn']})
         threading.Thread(target=_bg, daemon=True).start()
 
+    def _install_snort(self):
+        from installer import InstallerPopup
+        InstallerPopup(self, 'Install Snort IDS',
+            commands=[
+                'sudo apt-get update -qq',
+                # Pre-seed debconf so snort install never hangs on interface prompt
+                'echo "snort snort/address_range string 192.168.0.0/24" | sudo debconf-set-selections',
+                'echo "snort snort/interface string eth0" | sudo debconf-set-selections',
+                'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y snort || '
+                'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y snort2 || '
+                'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y snort3',
+                # Create log dir if missing
+                'sudo mkdir -p /var/log/snort',
+                'sudo chmod 777 /var/log/snort',
+                # Create minimal snort.conf if not present
+                'test -f /etc/snort/snort.conf || '
+                '(sudo mkdir -p /etc/snort && '
+                 'echo "include $RULE_PATH/local.rules" | sudo tee /etc/snort/snort.conf)',
+                'snort --version 2>&1 | head -2',
+            ],
+            success_msg='Snort installed!')
+        self.after(5000, lambda: threading.Thread(
+            target=self._bg_refresh, daemon=True).start())
+
     def _install(self, pkg, check_bin):
         from installer import InstallerPopup
-        # Pre-seed debconf to prevent interactive prompts during install
-        # Snort in particular asks for network ranges — we answer 0/0 to skip
-        cmds = [
-            'sudo apt-get update -qq',
-        ]
-        if 'snort' in pkg:
-            cmds += [
-                # Pre-answer snort debconf prompts to avoid hanging
-                'echo "snort snort/address_range string 0.0.0.0/0" | sudo debconf-set-selections',
-                'echo "snort snort/interface string eth0" | sudo debconf-set-selections',
-                f'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y {pkg}',
-                # Create basic snort config if missing
-                'sudo mkdir -p /etc/snort/rules /var/log/snort',
-                'test -f /etc/snort/snort.conf || echo "include $RULE_PATH/local.rules" | sudo tee /etc/snort/snort.conf',
-                'sudo touch /etc/snort/rules/local.rules',
-                'echo "✓ Snort installed and configured"',
-            ]
-        elif 'suricata' in pkg:
-            cmds += [
-                f'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y {pkg}',
-                'sudo mkdir -p /var/log/suricata /etc/suricata',
-                # Update rules if suricata-update is available
-                'which suricata-update && sudo suricata-update 2>/dev/null || echo "suricata-update not available, skipping rules download"',
-                'echo "✓ Suricata installed"',
-            ]
-        else:
-            cmds.append(f'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y {pkg}')
-
-        def _after_install():
-            threading.Thread(target=self._bg_refresh, daemon=True).start()
-
-        InstallerPopup(self, f'Install {pkg}', cmds,
-                       f'{pkg} installed!', on_done=_after_install)
+        InstallerPopup(self, f'Install {pkg}',
+                       [f'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y {pkg}'],
+                       f'{pkg} installed!')
+        self.after(5000, lambda: threading.Thread(
+            target=self._bg_refresh, daemon=True).start())
