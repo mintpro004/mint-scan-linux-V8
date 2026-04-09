@@ -14,29 +14,22 @@ _log = _get_logger("utils")
 from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 
 
-_pkexec_warned = False
-
 def run_cmd(cmd, timeout=8):
     """
     Run a shell command safely.
-    - Uses pkexec for sudo commands in GUI mode (no password prompt hang)
-    - Sets DEBIAN_FRONTEND=noninteractive so apt never waits for input
-    - Logs errors properly instead of printing to stderr
-    - Handles Timeout, FileNotFound, Permission errors distinctly
+    Uses sudo -n (passwordless) so commands work on Chromebook/Crostini.
+    Sets DEBIAN_FRONTEND=noninteractive for apt commands.
     """
-    global _pkexec_warned
     original_cmd = cmd
 
+    # For sudo commands: use sudo -n (non-interactive) first,
+    # fall back to plain sudo (user may have passwordless sudo configured)
+    # sudo -n = non-interactive; works with Chromebook passwordless sudo
     if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
-        has_pkexec = shutil.which('pkexec')
-        if has_pkexec:
-            inner        = cmd.strip()[5:].strip()
-            inner_quoted = inner.replace("'", "'\''")
-            cmd          = f"pkexec bash -c '{inner_quoted}'"
-        else:
-            if not _pkexec_warned:
-                _log.warning('pkexec not found — sudo may fail in GUI mode')
-                _pkexec_warned = True
+        inner = cmd.strip()[5:].strip()
+        inner_q = inner.replace("'", "'\\''")
+        # sudo -n tries without password; if that fails, try plain sudo
+        cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
 
     run_env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
 
@@ -67,10 +60,13 @@ def run_cmd(cmd, timeout=8):
 
 def get_public_ip_info():
     """Fetch real public IP, ISP, city, country from ipapi.co."""
-    import requests
     try:
-        r = requests.get('https://ipapi.co/json/', timeout=6)
-        return r.json()
+        import urllib.request
+        req = urllib.request.Request(
+            'https://ipapi.co/json/',
+            headers={'User-Agent': 'MintScan/8'})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            return json.loads(r.read().decode())
     except Exception:
         return {}
 
@@ -105,22 +101,38 @@ def ping(host='1.1.1.1', count=1):
 
 
 def copy_to_clipboard(text):
-    """Copy text to clipboard using tkinter or xclip."""
+    """Copy text to clipboard using xclip, xsel, or tkinter."""
+    # Try xclip first (most reliable on Linux)
+    if shutil.which('xclip'):
+        try:
+            p = subprocess.Popen(['xclip', '-selection', 'clipboard'],
+                                  stdin=subprocess.PIPE)
+            p.communicate(input=text.encode())
+            return True
+        except Exception:
+            pass
+    # Try xsel
+    if shutil.which('xsel'):
+        try:
+            p = subprocess.Popen(['xsel', '--clipboard', '--input'],
+                                  stdin=subprocess.PIPE)
+            p.communicate(input=text.encode())
+            return True
+        except Exception:
+            pass
+    # Tkinter fallback
     try:
         import tkinter as tk
         root = tk.Tk()
         root.withdraw()
         root.clipboard_clear()
         root.clipboard_append(text)
-        root.update() # now it stays on the clipboard
-        root.destroy()
+        root.update()
+        root.after(2000, root.destroy)
+        root.mainloop()
         return True
     except Exception:
-        try:
-            subprocess.run(f"echo -n '{text}' | xclip -selection clipboard", shell=True, timeout=2)
-            return True
-        except Exception:
-            return False
+        return False
 
 
 def get_wifi_networks():
@@ -130,19 +142,15 @@ def get_wifi_networks():
     """
     networks = []
 
-    # Method 1: nmcli (best, works on most Linux)
-    # Try to trigger a rescan first
+    # Rescan first
     run_cmd("nmcli device wifi rescan 2>/dev/null", timeout=5)
-    
+
     out, err, rc = run_cmd(
-        "nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null"
-    )
-    
-    # If nmcli failed or returned nothing, try with sudo (some systems require it for scanning)
+        "nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null")
+
     if (rc != 0 or not out) and os.geteuid() != 0:
         out, err, rc = run_cmd(
-            "sudo nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null"
-        )
+            "sudo nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null")
 
     if rc == 0 and out:
         for line in out.strip().split('\n'):
@@ -170,19 +178,19 @@ def get_wifi_networks():
         if networks:
             return sorted(networks, key=lambda x: -x['signal'])
 
-    # Method 2: iwlist scan fallback
+    # Fallback: iwlist scan
     iface = get_wifi_interface()
     if iface:
         out, _, rc = run_cmd(f'sudo iwlist {iface} scan 2>/dev/null')
         if rc == 0 and 'ESSID' in out:
             cells = out.split('Cell ')
             for cell in cells[1:]:
-                ssid_m    = re.search(r'ESSID:"([^"]*)"', cell)
-                signal_m  = re.search(r'Signal level=(-?\d+)', cell)
-                enc_m     = re.search(r'Encryption key:(on|off)', cell)
-                freq_m    = re.search(r'Frequency:([\d.]+)', cell)
-                bssid_m   = re.search(r'Address: ([0-9A-F:]+)', cell)
-                chan_m    = re.search(r'Channel:(\d+)', cell)
+                ssid_m   = re.search(r'ESSID:"([^"]*)"', cell)
+                signal_m = re.search(r'Signal level=(-?\d+)', cell)
+                enc_m    = re.search(r'Encryption key:(on|off)', cell)
+                freq_m   = re.search(r'Frequency:([\d.]+)', cell)
+                bssid_m  = re.search(r'Address: ([0-9A-F:]+)', cell)
+                chan_m   = re.search(r'Channel:(\d+)', cell)
                 networks.append({
                     'ssid':     ssid_m.group(1)   if ssid_m   else '(hidden)',
                     'bssid':    bssid_m.group(1)  if bssid_m  else '—',
@@ -202,7 +210,6 @@ def get_wifi_interface():
         parts = out.strip().split()
         if len(parts) >= 2:
             return parts[-1]
-    # Fallback: check /sys/class/net
     try:
         for iface in os.listdir('/sys/class/net'):
             if os.path.exists(f'/sys/class/net/{iface}/wireless'):
@@ -213,15 +220,13 @@ def get_wifi_interface():
 
 
 def get_current_wifi():
-    """Get currently connected SSID and details."""
+    """Get currently connected SSID."""
     out, _, rc = run_cmd('nmcli -t -f NAME,TYPE,DEVICE,STATE connection show --active 2>/dev/null')
     for line in out.split('\n'):
         if 'wifi' in line.lower() or '802-11' in line.lower():
             parts = line.split(':')
             if parts:
                 return parts[0]
-
-    # iwgetid fallback
     out, _, rc = run_cmd('iwgetid -r 2>/dev/null')
     if rc == 0 and out:
         return out.strip()
@@ -257,7 +262,6 @@ def get_network_interfaces():
 
 def get_battery_info():
     """Read real battery info from /sys/class/power_supply."""
-    info = {}
     base = '/sys/class/power_supply'
     if not os.path.exists(base):
         return None
@@ -276,16 +280,15 @@ def get_battery_info():
                 voltage = r('voltage_now')
                 current = r('current_now')
                 cycles  = r('cycle_count')
-                info = {
-                    'level':    int(cap) if cap else None,
-                    'status':   status or 'Unknown',
-                    'health':   health or 'Unknown',
-                    'tech':     tech or 'Unknown',
-                    'voltage':  f"{int(voltage)/1e6:.2f}V" if voltage else '—',
-                    'current':  f"{abs(int(current))/1e6:.2f}A" if current else '—',
-                    'cycles':   cycles or '—',
+                return {
+                    'level':   int(cap) if cap else None,
+                    'status':  status or 'Unknown',
+                    'health':  health or 'Unknown',
+                    'tech':    tech or 'Unknown',
+                    'voltage': f"{int(voltage)/1e6:.2f}V" if voltage else '—',
+                    'current': f"{abs(int(current))/1e6:.2f}A" if current else '—',
+                    'cycles':  cycles or '—',
                 }
-                return info
         except Exception:
             continue
     return None
@@ -295,8 +298,6 @@ def get_system_info():
     """Collect real system information."""
     import platform
     info = {}
-
-    # OS info
     info['os']       = platform.system()
     info['os_ver']   = platform.version()
     info['distro']   = platform.platform()
@@ -304,12 +305,8 @@ def get_system_info():
     info['arch']     = platform.architecture()[0]
     info['hostname'] = get_hostname()
     info['kernel']   = run_cmd('uname -r')[0]
-
-    # CPU
-    info['cpu_model'] = run_cmd("grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2")[0].strip()
-    info['cpu_cores'] = run_cmd("nproc")[0]
-
-    # Memory
+    info['cpu_model']= run_cmd("grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2")[0].strip()
+    info['cpu_cores']= run_cmd("nproc")[0]
     mem_out = run_cmd("free -h | grep Mem")[0]
     if mem_out:
         parts = mem_out.split()
@@ -317,11 +314,7 @@ def get_system_info():
             info['ram_total'] = parts[1]
             info['ram_used']  = parts[2]
             info['ram_free']  = parts[3] if len(parts) > 3 else '—'
-
-    # Uptime
     info['uptime'] = run_cmd("uptime -p")[0]
-
-    # Disk
     disk_out = run_cmd("df -h / | tail -1")[0]
     if disk_out:
         parts = disk_out.split()
@@ -330,21 +323,15 @@ def get_system_info():
             info['disk_used']  = parts[2]
             info['disk_free']  = parts[3]
             info['disk_pct']   = parts[4]
-
-    # GPU
     info['gpu'] = run_cmd("lspci 2>/dev/null | grep -i 'vga\\|3d\\|2d' | head -1 | cut -d: -f3")[0].strip() or '—'
-
     return info
 
 
 def get_processes(top_n=20):
-    """Get top processes by CPU/memory usage."""
-    out, _, _ = run_cmd(
-        f"ps aux --sort=-%cpu | head -{top_n+1} 2>/dev/null"
-    )
+    """Get top processes by CPU usage."""
+    out, _, _ = run_cmd(f"ps aux --sort=-%cpu | head -{top_n+1} 2>/dev/null")
     procs = []
-    lines = out.strip().split('\n')
-    for line in lines[1:]:
+    for line in out.strip().split('\n')[1:]:
         parts = line.split(None, 10)
         if len(parts) >= 11:
             procs.append({
@@ -374,7 +361,6 @@ def get_open_ports():
                     'port':    port_m.group(1),
                     'process': parts[5] if len(parts) > 5 else '—',
                 })
-    # UDP
     out2, _, _ = run_cmd("ss -ulnp 2>/dev/null")
     for line in out2.split('\n')[1:]:
         parts = line.split()
@@ -393,7 +379,6 @@ def get_open_ports():
 
 
 def check_root():
-    """Check if running as root."""
     return os.geteuid() == 0
 
 
@@ -423,17 +408,13 @@ SA_OPERATORS = {
 
 def analyse_phone_number(num):
     """Analyse a phone number for risk."""
-    clean = re.sub(r'[\s\-()]', '', num)
+    clean = re.sub(r'[\s\-()]()', '', num)
     risks = []
     if re.match(r'^0900', clean): risks.append('Premium rate (0900)')
     if re.match(r'^\+?1900', clean): risks.append('Premium rate (+1900)')
     if len(clean) < 7 and len(clean) > 2: risks.append('Short code')
     if re.search(r'(.)\1{4,}', clean): risks.append('Repeating digits')
     level = 'HIGH' if risks else 'LOW'
-
-    # SA operator
-    op = None
     sa_clean = re.sub(r'^\+27|^0027|^0', '', clean)
     op = SA_OPERATORS.get(sa_clean[:2])
-
     return {'risk': level, 'reasons': risks, 'operator': op, 'clean': clean}

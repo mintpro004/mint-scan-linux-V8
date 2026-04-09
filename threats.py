@@ -18,9 +18,16 @@ RISKY = {
 }
 
 def _r(cmd, timeout=10):
+    """Run command — Chromebook-safe sudo (no GUI polkit needed)."""
+    original = cmd.strip()
+    if original.startswith('sudo ') and os.geteuid() != 0:
+        inner = original[5:].strip()
+        inner_q = inner.replace("'", "'''")
+        cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
+    env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True,
-                           text=True, timeout=timeout)
+                           text=True, timeout=timeout, env=env)
         return r.stdout.strip(), r.stderr.strip(), r.returncode
     except Exception as e:
         return '', str(e), 1
