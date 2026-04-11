@@ -4,10 +4,10 @@ All heavy work runs in background threads. UI never freezes.
 """
 import tkinter as tk
 import customtkinter as ctk
-import threading, os, re, subprocess, time, queue
+import threading, os, re, subprocess, time, queue, shlex
 from widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn, InfoGrid, C, MONO, MONO_SM
 from installer import InstallerPopup
-from utils import run_cmd as _r_utils
+from utils import run_cmd as _r
 
 KNOWN_BAD = {
     '23':'Telnet','4444':'Metasploit','1337':'Suspicious',
@@ -18,9 +18,6 @@ RISKY = {
     '6379':'Redis','5900':'VNC','8080':'HTTP-Alt','3389':'RDP',
 }
 
-def _r(cmd, timeout=10):
-    """Delegates to utils.run_cmd — single authoritative implementation."""
-    return _r_utils(cmd, timeout=timeout)
 
 class ThreatsScreen(ctk.CTkFrame):
     def __init__(self, parent, app):
