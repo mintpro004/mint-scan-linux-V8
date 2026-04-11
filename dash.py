@@ -376,29 +376,15 @@ class DashScreen(ctk.CTkFrame):
         ipinfo   = get_public_ip_info()
         ports    = get_open_ports()
         procs    = get_processes(10)
-        # Fetch shell data in background too
-        cpu_out, _, _ = run_cmd("top -bn1 | grep 'Cpu(s)' | awk '{print $2}'")
-        try: cpu = float(cpu_out.strip().replace('%','').replace(',','.') or 0)
-        except: cpu = 0
-        mem_out, _, _ = run_cmd("free | grep Mem | awk '{printf \"%.0f\", $3/$2*100}'")
-        try: mem_pct = int(mem_out.strip() or 0)
-        except: mem_pct = 0
-        ufw_out, _, _ = run_cmd('ufw status 2>/dev/null | head -1')
-        fw_ok = 'active' in ufw_out.lower()
-        pkg_out, _, _ = run_cmd('apt list --upgradeable 2>/dev/null | wc -l')
-        try: pkg_n = max(0, int(pkg_out.strip()) - 1)
-        except: pkg_n = 0
         def _safe_render():
             try:
                 if self.winfo_exists():
-                    self._render(sysinfo, bat, local_ip, ipinfo, ports, procs,
-                                 cpu, mem_pct, fw_ok, pkg_n)
+                    self._render(sysinfo, bat, local_ip, ipinfo, ports, procs)
             except Exception as e:
                 pass
         self.after(0, _safe_render)
 
-    def _render(self, sysinfo, bat, local_ip, ipinfo, ports, procs,
-                  cpu=0, mem_pct=0, fw_ok=False, pkg_n=0):
+    def _render(self, sysinfo, bat, local_ip, ipinfo, ports, procs):
         # ── Score calculation ──────────────────────────────────
         score = 100
         danger_ports = {'23','4444','5555','1337','31337','7547'}
@@ -417,7 +403,13 @@ class DashScreen(ctk.CTkFrame):
         self._status_lbl.configure(text=status, text_color=col)
         self._pulse.set_color(col)
 
-        # ── Stat cards (data fetched in bg thread) ────────────
+        # ── Stat cards ────────────────────────────────────────
+        cpu_out, _, _ = run_cmd("top -bn1 | grep 'Cpu(s)' | awk '{print $2}'")
+        try: cpu = float(cpu_out.strip().replace('%','').replace(',','.') or 0)
+        except: cpu = 0
+        mem_out, _, _ = run_cmd("free | grep Mem | awk '{printf \"%.0f\", $3/$2*100}'")
+        try: mem_pct = int(mem_out.strip() or 0)
+        except: mem_pct = 0
 
         bat_pct = bat['level'] if bat and bat.get('level') else 0
         bat_col = C['ok'] if bat_pct > 60 else C['am'] if bat_pct > 20 else C['wn']
@@ -431,6 +423,8 @@ class DashScreen(ctk.CTkFrame):
         self._card_net.update(local_ip, ipinfo.get('city','—'), push_chart=None)
 
         # ── Threat status ─────────────────────────────────────
+        ufw, _, ufw_rc = run_cmd("ufw status 2>/dev/null | head -1")
+        fw_ok = 'active' in ufw.lower()
         self._threat_cards['firewall'].configure(
             text='ACTIVE' if fw_ok else 'OFF',
             text_color=C['ok'] if fw_ok else C['wn'])
@@ -443,6 +437,9 @@ class DashScreen(ctk.CTkFrame):
         self._threat_cards['ssh'].configure(
             text='UP' if any(p['port']=='22' for p in ports) else 'OFF',
             text_color=C['ok'])
+        pkg_out, _, _ = run_cmd("apt list --upgradeable 2>/dev/null | wc -l")
+        try: pkg_n = max(0, int(pkg_out.strip())-1)
+        except: pkg_n = 0
         self._threat_cards['updates'].configure(
             text=f'{pkg_n} pending' if pkg_n else 'Up to date',
             text_color=C['am'] if pkg_n > 0 else C['ok'])

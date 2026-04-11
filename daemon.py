@@ -4,6 +4,7 @@ Run Mint Scan headlessly as a background service.
 Installs a systemd unit, monitors threats, sends notifications.
 """
 import os, sys, subprocess, threading, time, signal
+from utils import run_cmd as _rc
 from logger import get_logger
 
 log = get_logger('daemon')
@@ -34,9 +35,10 @@ WantedBy=multi-user.target
 
 
 def install_service() -> tuple[bool, str]:
-    """Install and enable the systemd service."""
-    user    = os.environ.get('USER', 'root')
-    python  = os.path.join(BASE_DIR, 'venv', 'bin', 'python3')
+    """Install and enable the systemd service (Chromebook-safe sudo)."""
+    from utils import run_cmd as _rc
+    user   = os.environ.get('USER', 'mint')
+    python = os.path.join(BASE_DIR, 'venv', 'bin', 'python3')
     if not os.path.exists(python):
         python = sys.executable
     content = UNIT_CONTENT.format(user=user, base=BASE_DIR, python=python)
@@ -44,13 +46,12 @@ def install_service() -> tuple[bool, str]:
         tmp = '/tmp/mint-scan.service'
         with open(tmp, 'w') as f:
             f.write(content)
-        r = subprocess.run(f'sudo cp {tmp} {UNIT_FILE}',
-                           shell=True, capture_output=True)
-        if r.returncode != 0:
-            return False, r.stderr.decode()
-        subprocess.run('sudo systemctl daemon-reload', shell=True)
-        subprocess.run(f'sudo systemctl enable {UNIT_NAME}', shell=True)
-        subprocess.run(f'sudo systemctl start {UNIT_NAME}', shell=True)
+        out, err, rc = _rc(f'sudo cp {tmp} {UNIT_FILE}', timeout=10)
+        if rc != 0:
+            return False, err or out or f'exit={rc}'
+        _rc('sudo systemctl daemon-reload', timeout=10)
+        _rc(f'sudo systemctl enable {UNIT_NAME}', timeout=10)
+        _rc(f'sudo systemctl start {UNIT_NAME}', timeout=10)
         log.info('Daemon service installed and started')
         return True, f'Service installed: {UNIT_FILE}'
     except Exception as e:
@@ -58,11 +59,12 @@ def install_service() -> tuple[bool, str]:
 
 
 def uninstall_service() -> tuple[bool, str]:
+    from utils import run_cmd as _rc
     try:
-        subprocess.run(f'sudo systemctl stop {UNIT_NAME}', shell=True)
-        subprocess.run(f'sudo systemctl disable {UNIT_NAME}', shell=True)
-        subprocess.run(f'sudo rm -f {UNIT_FILE}', shell=True)
-        subprocess.run('sudo systemctl daemon-reload', shell=True)
+        _rc(f'sudo systemctl stop {UNIT_NAME}', timeout=10)
+        _rc(f'sudo systemctl disable {UNIT_NAME}', timeout=10)
+        _rc(f'sudo rm -f {UNIT_FILE}', timeout=10)
+        _rc('sudo systemctl daemon-reload', timeout=10)
         log.info('Daemon service removed')
         return True, 'Service removed'
     except Exception as e:

@@ -76,10 +76,11 @@ def check_for_update(timeout=8):
 
     # Method 3: Local git — compare with remote
     try:
-        r = subprocess.run('git fetch origin --dry-run 2>&1',
+        from utils import run_cmd as _run_cmd
+        r = subprocess.run('git fetch origin 2>&1',
                            shell=True, capture_output=True, text=True,
                            cwd=BASE_DIR, timeout=20)
-        behind_out, _, _ = run_cmd(
+        behind_out, _, _ = _run_cmd(
             'git rev-list HEAD..origin/main --count 2>/dev/null', timeout=10)
         try:
             behind = int(behind_out.strip())
@@ -123,8 +124,8 @@ def do_git_update(log_fn=None):
         return False
 
     _l('Fixing ownership...')
-    subprocess.run(f'sudo chown -R $USER:$USER "{BASE_DIR}"',
-                   shell=True, capture_output=True)
+    from utils import run_cmd as _rc
+    _rc(f'sudo chown -R $USER:$USER "{BASE_DIR}"', timeout=15)
 
     _l('Fetching from GitHub...')
     r = subprocess.run('git fetch origin', shell=True,

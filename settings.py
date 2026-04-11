@@ -377,31 +377,33 @@ class SettingsScreen(ctk.CTkFrame):
             'show_clock':    True,
         }
         if save_settings(self.settings):
-            # Apply immediately
+            # Step 1: Apply theme colours to the global palette
             _widgets.apply_theme(
-                self.settings['theme'], 
-                self.settings['accent_color'], 
-                self.settings['font_size']
-            )
+                self.settings['theme'],
+                self.settings['accent_color'],
+                self.settings['font_size'])
+
+            # Step 2: Apply UI scale (customtkinter handles this globally)
             try:
                 ctk.set_widget_scaling(self.settings['ui_scale'])
             except Exception:
                 pass
 
-            # Apply safely without destroying any frames
+            # Step 3: Tell app to recolour existing widgets — no rebuild
             if hasattr(self.app, 'refresh_ui'):
                 self.app.refresh_ui()
 
+            # Step 4: Update status — widget still exists because we didn't destroy anything
             try:
                 self.status_lbl.configure(
-                    text="✓ Settings saved and applied — no restart needed.",
+                    text="✓ Saved — theme applied immediately. No restart needed.",
                     text_color=_widgets.C['ok'])
             except Exception:
                 pass
         else:
             try:
                 self.status_lbl.configure(
-                    text="✗ Could not save settings", text_color=_widgets.C['wn'])
+                    text="✗ Could not save settings file", text_color=_widgets.C['wn'])
             except Exception:
                 pass
 

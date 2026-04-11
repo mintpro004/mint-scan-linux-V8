@@ -255,14 +255,16 @@ class GuardianScreen(ctk.CTkFrame):
 
     def _panic(self):
         log.warning('PANIC BUTTON ACTIVATED')
-        cmds = [
-            'nmcli networking off',
-            'ip link set wlan0 down 2>/dev/null || true',
-            'ip link set eth0 down 2>/dev/null || true',
-            'loginctl lock-session',
-        ]
-        for cmd in cmds:
-            run_cmd(cmd)
+        # Kill network - try multiple methods
+        run_cmd('nmcli networking off 2>/dev/null || true', timeout=5)
+        # Bring down all UP interfaces
+        ifaces_out, _, _ = run_cmd("ip link show | awk -F: '/state UP/{print $2}' | tr -d ' '")
+        for iface in ifaces_out.splitlines():
+            iface = iface.strip()
+            if iface and iface != 'lo':
+                run_cmd(f'sudo ip link set {iface} down 2>/dev/null || true', timeout=3)
+        # Lock screen
+        run_cmd('loginctl lock-session 2>/dev/null || xdg-screensaver lock 2>/dev/null || true', timeout=3)
         self._glog_line('☢ PANIC EXECUTED — network killed, screen locked')
         critical('☢ Panic Button', 'Network killed and screen locked.')
 

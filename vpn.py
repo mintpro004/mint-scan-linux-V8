@@ -320,19 +320,36 @@ class VPNScreen(ctk.CTkFrame):
     def _wg_up(self):
         iface = self._get_wg_iface()
         if not iface:
-            self._ulog('No WireGuard config selected. Place a .conf file in /etc/wireguard/ or ~/vpn/')
+            self._ulog('No WireGuard config selected.')
+            self._ulog('  → Place a .conf file in /etc/wireguard/ or ~/vpn/')
+            self._ulog('  → Then tap ↺ REFRESH to detect it')
             return
         conf = self._wg_var.get()
         self._ulog(f'Starting WireGuard: {iface}')
+        self._ulog(f'Config: {conf}')
         def _bg():
-            # Copy to /etc/wireguard if needed
+            # Check wg-quick is installed
+            if not shutil.which('wg-quick'):
+                self._safe_after(0, self._ulog,
+                    '✗ wg-quick not installed. Tap ⬇ INSTALL WIREGUARD below.')
+                return
+            # Copy conf to /etc/wireguard/ if not already there
             target = f'/etc/wireguard/{iface}.conf'
-            if not os.path.exists(target) and os.path.exists(conf):
-                run_cmd(f'sudo cp "{conf}" "{target}"', timeout=10)
-            out, err, rc = run_cmd(f'sudo wg-quick up {iface}', timeout=25)
-            msg = out or err or f'Exit code: {rc}'
-            self._safe_after(0, self._ulog, ('✓ ' if rc==0 else '✗ ') + msg[:120])
-            self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
+            if os.path.exists(conf) and not os.path.exists(target):
+                out, err, rc = run_cmd(
+                    f'sudo mkdir -p /etc/wireguard && '
+                    f'sudo cp "{conf}" "{target}" && sudo chmod 600 "{target}"',
+                    timeout=10)
+                if rc == 0:
+                    self._safe_after(0, self._ulog, f'Copied config to {target}')
+                else:
+                    self._safe_after(0, self._ulog, f'Note: {err or out}')
+            # Bring up the tunnel
+            out, err, rc = run_cmd(f'sudo wg-quick up {iface}', timeout=30)
+            result = out or err or f'exit={rc}'
+            self._safe_after(0, self._ulog, ('✓ Connected: ' if rc==0 else '✗ Failed: ') + result[:150])
+            self._safe_after(800, lambda: threading.Thread(
+                target=self._bg_refresh, daemon=True).start())
         threading.Thread(target=_bg, daemon=True).start()
 
     def _wg_down(self):

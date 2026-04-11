@@ -303,7 +303,7 @@ class WifiScreen(ctk.CTkFrame):
                 variant='success').pack(pady=4)
         else:
             ctk.CTkLabel(popup,
-                text=f"Cannot read: {name}\n\nMake sure to ALLOW the pkexec prompt.",
+                text=f"Cannot read: {name}\n\nRun: sudo bash run.sh if prompted, or check sudo permissions.",
                 font=MONO_SM, text_color=C['mu'], justify='center').pack(expand=True, pady=10)
         Btn(popup, "CLOSE", command=popup.destroy, variant='ghost').pack(pady=4)
 
