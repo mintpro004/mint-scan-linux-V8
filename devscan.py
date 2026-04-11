@@ -8,7 +8,7 @@ import customtkinter as ctk
 import threading, subprocess, re, time, os, socket, json
 from widgets import (ScrollableFrame, Card, SectionHeader, InfoGrid,
                      ResultBox, Btn, Badge, C, MONO, MONO_SM)
-from utils import run_cmd as _run, run_safe
+from utils import run_cmd as _run
 
 # ── Device type fingerprint DB ────────────────────────────────────
 # (vendor keyword → device type, icon, risk_ports)
@@ -278,7 +278,7 @@ class DevScanScreen(ctk.CTkFrame):
     def _discover_hosts(self, subnet):
         devices = []
         # Try nmap -sn (ping scan)
-        out, _, rc = run_safe(["nmap -sn --host-timeout 3s", (subnet,), "2>/dev/null"], timeout=60)
+        out, _, rc = _run(f"nmap -sn --host-timeout 3s {subnet} 2>/dev/null", timeout=60)
         if rc == 0 and 'Nmap scan report' in out:
             cur = {}
             for line in out.split('\n'):
@@ -366,8 +366,8 @@ class DevScanScreen(ctk.CTkFrame):
                      '5900,6379,6667,6668,6670,7547,8000,8008,8080,8081,'
                      '8088,8443,8888,9000,9001,9050,9100,9197,27017,37215,'
                      '37777,52869')
-        out, _, rc = run_safe(
-            ["nmap -T4 --open -p", (port_list,), "--host-timeout 8s", (ip,), "2>/dev/null"],
+        out, _, rc = _run(
+            f"nmap -T4 --open -p {port_list} --host-timeout 8s {ip} 2>/dev/null",
             timeout=20)
         if rc == 0:
             for line in out.split('\n'):
@@ -672,8 +672,8 @@ class DevScanScreen(ctk.CTkFrame):
     def _deep_scan_device(self, ip):
         self._log(f"Deep scan: {ip}")
         def _do():
-            out, _, _ = run_safe(
-                ["nmap -T4 -sV --open -p- --host-timeout 30s", (ip,), "2>/dev/null"],
+            out, _, _ = _run(
+                f"nmap -T4 -sV --open -p- --host-timeout 30s {ip} 2>/dev/null",
                 timeout=60)
             self._log(f"\n── Deep scan {ip} ──\n{out[:800]}")
         threading.Thread(target=_do, daemon=True).start()

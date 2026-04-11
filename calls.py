@@ -21,10 +21,8 @@ def get_gnome_calls():
 
     for path in paths:
         if os.path.exists(path):
-            if path.endswith(".db"):
-                from utils import run_safe
-
-                out, _, rc = run_safe(["sqlite3", (path,), " 'SELECT * FROM calls LIMIT 100' 2>/dev/null"])
+            if path.endswith('.db'):
+                out, _, rc = run_cmd(f"sqlite3 '{path}' 'SELECT * FROM calls LIMIT 100' 2>/dev/null")
                 if rc == 0 and out:
                     for line in out.strip().split('\n'):
                         parts = line.split('|')
