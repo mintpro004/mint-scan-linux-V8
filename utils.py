@@ -7,29 +7,43 @@ import json
 import threading
 import time
 import shutil
+import shlex
+import secrets
 from logger import get_logger as _get_logger
 _log = _get_logger("utils")
 
 # Import colours and fonts from widgets (single source of truth)
 from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 
+_auth_token = secrets.token_hex(8)
 
-def run_cmd(cmd, timeout=8):
+def get_auth_token():
+    return _auth_token
+
+def run_cmd(cmd, timeout=10, use_sudo=False):
     """
-    Run a shell command safely.
-    Uses sudo -n (passwordless) so commands work on Chromebook/Crostini.
-    Sets DEBIAN_FRONTEND=noninteractive for apt commands.
+    Unified, hardened command runner.
+    - Uses shlex for safe quoting.
+    - Prevents sudo hangs by using sudo -n (non-interactive).
+    - Centralizes execution logic for the entire app.
     """
+    if use_sudo and not cmd.startswith('sudo ') and os.geteuid() != 0:
+        cmd = f"sudo {cmd}"
+
     original_cmd = cmd
-
-    # For sudo commands: use sudo -n (non-interactive) first,
-    # fall back to plain sudo (user may have passwordless sudo configured)
-    # sudo -n = non-interactive; works with Chromebook passwordless sudo
+    
+    # Hardened sudo handling: Use sudo -n to avoid hanging on password prompts.
+    # If sudo -n fails, we return the error immediately rather than hanging.
     if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
-        inner = cmd.strip()[5:].strip()
-        inner_q = inner.replace("'", "'\\''")
-        # sudo -n tries without password; if that fails, try plain sudo
-        cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
+        # Split 'sudo ' from the rest
+        parts = cmd.strip().split(None, 1)
+        if len(parts) > 1:
+            inner_cmd = parts[1]
+            # Wrap in bash -c with proper escaping
+            cmd = f"sudo -n bash -c {shlex.quote(inner_cmd)}"
+        else:
+            # Just 'sudo' without command, return error
+            return '', 'Invalid sudo command', 1
 
     run_env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
 
@@ -37,24 +51,22 @@ def run_cmd(cmd, timeout=8):
         r = subprocess.run(
             cmd, shell=True, capture_output=True,
             text=True, timeout=timeout, env=run_env)
-        if r.returncode != 0 and r.stderr.strip():
-            _log.debug(f'cmd [{r.returncode}]: {r.stderr.strip()[:120]}')
-        return r.stdout.strip(), r.stderr.strip(), r.returncode
+        
+        stdout = r.stdout.strip() if r.stdout else ""
+        stderr = r.stderr.strip() if r.stderr else ""
+        
+        if r.returncode != 0:
+            if "sudo: a password is required" in stderr.lower() or "sudo: a password is required" in stdout.lower():
+                stderr = "Authentication required (sudo password). Run 'sudo -v' in terminal first or use a passwordless sudo user."
+            _log.debug(f"cmd [{r.returncode}]: {stderr[:120]}")
+            
+        return stdout, stderr, r.returncode
 
     except subprocess.TimeoutExpired:
-        _log.warning(f'Timeout ({timeout}s): {original_cmd[:80]}')
-        return '', f'timeout after {timeout}s', 1
-
-    except FileNotFoundError as e:
-        _log.error(f'Not found: {e}')
-        return '', str(e), 127
-
-    except PermissionError as e:
-        _log.error(f'Permission denied: {e}')
-        return '', str(e), 126
-
+        _log.warning(f"Timeout ({timeout}s): {original_cmd[:80]}")
+        return '', f'Command timed out after {timeout}s', 124
     except Exception as e:
-        _log.error(f'run_cmd error: {e}')
+        _log.error(f"run_cmd error: {e}")
         return '', str(e), 1
 
 

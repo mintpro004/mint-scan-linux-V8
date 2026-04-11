@@ -4,9 +4,10 @@ All heavy work runs in background threads. UI never freezes.
 """
 import tkinter as tk
 import customtkinter as ctk
-import threading, os, re, subprocess, time, queue
+import threading, os, re, subprocess, time, queue, shlex
 from widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn, InfoGrid, C, MONO, MONO_SM
 from installer import InstallerPopup
+from utils import run_cmd as _r
 
 KNOWN_BAD = {
     '23':'Telnet','4444':'Metasploit','1337':'Suspicious',
@@ -16,21 +17,6 @@ RISKY = {
     '21':'FTP','25':'SMTP','3306':'MySQL','27017':'MongoDB',
     '6379':'Redis','5900':'VNC','8080':'HTTP-Alt','3389':'RDP',
 }
-
-def _r(cmd, timeout=10):
-    """Run command — Chromebook-safe sudo (no GUI polkit needed)."""
-    original = cmd.strip()
-    if original.startswith('sudo ') and os.geteuid() != 0:
-        inner = original[5:].strip()
-        inner_q = inner.replace("'", "'''")
-        cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
-    env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
-    try:
-        r = subprocess.run(cmd, shell=True, capture_output=True,
-                           text=True, timeout=timeout, env=env)
-        return r.stdout.strip(), r.stderr.strip(), r.returncode
-    except Exception as e:
-        return '', str(e), 1
 
 
 class ThreatsScreen(ctk.CTkFrame):
