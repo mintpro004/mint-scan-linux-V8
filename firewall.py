@@ -4,7 +4,7 @@ import customtkinter as ctk
 import threading, subprocess, re, time, shutil, os
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
 from installer import InstallerPopup
-from utils import run_cmd as _run
+from utils import run_cmd as _run, run_safe
 
 
 class FirewallScreen(ctk.CTkFrame):
@@ -393,7 +393,7 @@ class FirewallScreen(ctk.CTkFrame):
     def _allow_port(self, port, name=''):
         self._alog(f"Allowing port {port} ({name})...")
         def _do(pt=port, nm=name):
-            out, err, rc = _run(f"sudo ufw allow {pt}")
+            out, err, rc = run_safe(["sudo ufw allow", (pt,)])
             self._safe_after(0, self._alog,
                        f"{'✓ Allowed port '+pt+' ('+nm+')' if rc==0 else '✗ '+( err or out)[:60]}")
             self.after(500, lambda: threading.Thread(
@@ -416,20 +416,21 @@ class FirewallScreen(ctk.CTkFrame):
             return
 
         if from_ip:
-            cmd = f"sudo ufw {action} from {from_ip} to any port {port}"
-            if proto != 'any':
-                cmd += f" proto {proto}"
+            if proto == 'any':
+                parts = ["sudo ufw", action, "from", (from_ip,), "to any port", (port,)]
+            else:
+                parts = ["sudo ufw", action, "from", (from_ip,), "to any port", (port,), "proto", (proto,)]
         else:
             if proto == 'any':
-                cmd = f"sudo ufw {action} {port}"
+                parts = ["sudo ufw", action, (port,)]
             else:
-                cmd = f"sudo ufw {action} {port}/{proto}"
+                parts = ["sudo ufw", action, (f"{port}/{proto}",)]
 
-        self._alog(f"Running: {cmd}")
-        def _do(c=cmd):
-            out, err, rc = _run(c)
+        self._alog(f"Running rule application for {port}...")
+        def _do(p=parts):
+            out, err, rc = run_safe(p)
             self._safe_after(0, self._alog,
-                       f"{'✓ Rule applied: '+c if rc==0 else '✗ '+( err or out)[:100]}")
+                       f"{'✓ Rule applied' if rc==0 else '✗ '+( err or out)[:100]}")
             self.after(500, lambda: threading.Thread(
                 target=self._load_status, daemon=True).start())
         threading.Thread(target=_do, daemon=True).start()
@@ -441,8 +442,8 @@ class FirewallScreen(ctk.CTkFrame):
             return
         self._alog(f"Deleting rule for port {port}...")
         def _do(pt=port):
-            out, err, rc = _run(f"echo 'y' | sudo ufw delete allow {pt} 2>/dev/null || "
-                                 f"echo 'y' | sudo ufw delete deny {pt} 2>/dev/null")
+            out, err, rc = run_safe(["echo 'y' | sudo ufw delete allow", (pt,), "2>/dev/null || ",
+                                     "echo 'y' | sudo ufw delete deny", (pt,), "2>/dev/null"])
             self._safe_after(0, self._alog,
                        f"{'✓ Rule deleted for port '+pt if rc==0 else '✗ '+( err or out)[:80]}")
             self.after(500, lambda: threading.Thread(
@@ -452,7 +453,7 @@ class FirewallScreen(ctk.CTkFrame):
     def _delete_numbered(self, num):
         self._alog(f"Deleting rule #{num}...")
         def _do(n=num):
-            out, err, rc = _run(f"echo 'y' | sudo ufw delete {n} 2>/dev/null")
+            out, err, rc = run_safe(["echo 'y' | sudo ufw delete", (n,), "2>/dev/null"])
             self._safe_after(0, self._alog,
                        f"{'✓ Deleted rule #'+n if rc==0 else '✗ '+( err or out)[:80]}")
             self.after(800, lambda: threading.Thread(

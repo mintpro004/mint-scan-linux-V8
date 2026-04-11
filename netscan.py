@@ -4,7 +4,7 @@ import customtkinter as ctk
 import threading, subprocess, re, time, os
 from installer import install_nmap
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-from utils import run_cmd as run, copy_to_clipboard
+from utils import run_cmd as run, run_safe, copy_to_clipboard
 from reports import prompt_save_report
 
 
@@ -191,7 +191,7 @@ class NetScanScreen(ctk.CTkFrame):
         subnet = ip_out.strip() or '192.168.1.0/24'
 
         # Try nmap first, fallback to arp
-        nmap_out, _, nmap_rc = run(f"nmap -sn {subnet} 2>/dev/null", timeout=30)
+        nmap_out, _, nmap_rc = run_safe(["nmap -sn", (subnet,), "2>/dev/null"], timeout=30)
 
         devices = []
         if nmap_rc == 0 and 'Nmap scan' in nmap_out:
@@ -267,7 +267,7 @@ class NetScanScreen(ctk.CTkFrame):
 
     def _do_device_scan(self, ip):
         self._safe_after(0, lambda: self._log_traffic(f"Scanning {ip}..."))
-        out, _, _ = run(f"nmap -T4 --open -p 1-1000 {ip} 2>/dev/null", timeout=30)
+        out, _, _ = run_safe(["nmap -T4 --open -p 1-1000", (ip,), "2>/dev/null"], timeout=30)
         self._safe_after(0, lambda: self._log_traffic(f"Results for {ip}:\n{out[:600]}"))
 
     def _toggle_capture(self):

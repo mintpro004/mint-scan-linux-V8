@@ -7,7 +7,7 @@ import tkinter as tk
 import customtkinter as ctk
 import subprocess, threading, re, time, os, json
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-from utils import run_cmd as _run
+from utils import run_cmd as _run, run_safe, copy_to_clipboard
 from reports import prompt_save_report
 
 
@@ -267,8 +267,8 @@ class InvestigateScreen(ctk.CTkFrame):
             self._log(f"Target type: Domain ({target})")
             self._prog(0.1)
             # Resolve to IP first
-            ip_out, _, _ = _run(f"dig +short {target} A 2>/dev/null | head -1")
-            ip = ip_out.strip() if ip_out else ''
+            ip_out, _, _ = run_safe(["dig +short", (target,), "A 2>/dev/null | head -1"])
+            ip = ip_out.strip() if ip_out else ""
             if ip:
                 self._log(f"Resolved to IP: {ip}")
                 geo_data = self._geolocate_ip(ip, findings)
@@ -280,8 +280,13 @@ class InvestigateScreen(ctk.CTkFrame):
                 self._port_scan_target(ip, findings)
             else:
                 self._log("Could not resolve domain to IP")
-                findings.append({'level':'INFO','title':f'Domain: {target}',
-                                  'desc':'Could not resolve — may be offline or blocked'})
+                findings.append(
+                    {
+                        "level": "INFO",
+                        "title": f"Domain: {target}",
+                        "desc": "Could not resolve — may be offline or blocked",
+                    }
+                )
         elif port_pattern:
             port = port_pattern.group(1)
             self._log(f"Target type: Port {port}")
@@ -300,7 +305,7 @@ class InvestigateScreen(ctk.CTkFrame):
         self._investigating = False
 
         self._safe_after(0, self._render_results, target, findings, geo_data, net_data, analysis)
-        self._safe_after(0, lambda: self.stop_btn.configure(state='disabled'))
+        self._safe_after(0, lambda: self.stop_btn.configure(state="disabled"))
 
     # ── Geolocation ───────────────────────────────────────────
 
@@ -310,54 +315,66 @@ class InvestigateScreen(ctk.CTkFrame):
 
         if _is_private_ip(ip):
             self._log(f"  {ip} is a private/local IP address")
-            data = {'ip': ip, 'private': True, 'country': 'Local Network',
-                    'org': 'Private', 'city': '—', 'isp': 'Internal'}
+            data = {"ip": ip, "private": True, "country": "Local Network", "org": "Private", "city": "—", "isp": "Internal"}
             return data
 
         # Try ipapi.co
-        out, _, rc = _run(f"curl -s --max-time 6 https://ipapi.co/{ip}/json/ 2>/dev/null")
+        out, _, rc = run_safe(["curl -s --max-time 6 https://ipapi.co/", (ip,), "/json/ 2>/dev/null"])
         if rc == 0 and out:
             try:
                 j = json.loads(out)
                 data = {
-                    'ip':       j.get('ip', ip),
-                    'country':  j.get('country_name', '—'),
-                    'country_code': j.get('country_code', '—'),
-                    'region':   j.get('region', '—'),
-                    'city':     j.get('city', '—'),
-                    'isp':      j.get('org', '—'),
-                    'asn':      j.get('asn', '—'),
-                    'timezone': j.get('timezone', '—'),
-                    'lat':      j.get('latitude', '—'),
-                    'lon':      j.get('longitude', '—'),
-                    'private':  False,
+                    "ip": j.get("ip", ip),
+                    "country": j.get("country_name", "—"),
+                    "country_code": j.get("country_code", "—"),
+                    "region": j.get("region", "—"),
+                    "city": j.get("city", "—"),
+                    "isp": j.get("org", "—"),
+                    "asn": j.get("asn", "—"),
+                    "timezone": j.get("timezone", "—"),
+                    "lat": j.get("latitude", "—"),
+                    "lon": j.get("longitude", "—"),
+                    "private": False,
                 }
                 self._log(f"  Location: {data['city']}, {data['country']}")
                 self._log(f"  ISP/Org: {data['isp']}")
                 self._log(f"  ASN: {data['asn']}")
 
                 # Flag suspicious ISPs
-                isp_lower = str(data['isp']).lower()
+                isp_lower = str(data["isp"]).lower()
                 suspicious_isps = [
-                    'tor', 'vpn', 'proxy', 'anonymous', 'hosting',
-                    'digitalocean', 'linode', 'vultr', 'ovh', 'hetzner',
-                    'choopa', 'frantech', 'psychz', 'serverius'
+                    "tor",
+                    "vpn",
+                    "proxy",
+                    "anonymous",
+                    "hosting",
+                    "digitalocean",
+                    "linode",
+                    "vultr",
+                    "ovh",
+                    "hetzner",
+                    "choopa",
+                    "frantech",
+                    "psychz",
+                    "serverius",
                 ]
                 for sus in suspicious_isps:
                     if sus in isp_lower:
-                        findings.append({
-                            'level': 'HIGH',
-                            'title': f'Suspicious hosting provider: {data["isp"]}',
-                            'desc':  f'This IP is hosted by a provider commonly used for VPNs, '
-                                     f'proxies, or anonymous services. Country: {data["country"]}',
-                        })
+                        findings.append(
+                            {
+                                "level": "HIGH",
+                                "title": f"Suspicious hosting provider: {data['isp']}",
+                                "desc": f"This IP is hosted by a provider commonly used for VPNs, "
+                                f"proxies, or anonymous services. Country: {data['country']}",
+                            }
+                        )
                         break
             except Exception as e:
                 self._log(f"  Geo parse error: {e}")
-                data = {'ip': ip, 'country': '—', 'city': '—', 'isp': '—'}
+                data = {"ip": ip, "country": "—", "city": "—", "isp": "—"}
         else:
             self._log("  Could not reach geolocation API (no internet?)")
-            data = {'ip': ip, 'country': 'Unknown', 'city': '—', 'isp': '—'}
+            data = {"ip": ip, "country": "Unknown", "city": "—", "isp": "—"}
 
         return data
 
@@ -368,55 +385,73 @@ class InvestigateScreen(ctk.CTkFrame):
         data = {}
 
         # Reverse DNS
-        rdns, _, _ = _run(f"dig +short -x {ip} 2>/dev/null | head -1")
+        rdns, _, _ = run_safe(["dig +short -x", (ip,), "2>/dev/null | head -1"])
         if not rdns:
-            rdns, _, _ = _run(f"host {ip} 2>/dev/null | head -1")
-        data['rdns'] = rdns.strip().rstrip('.') if rdns else '(no reverse DNS)'
+            rdns, _, _ = run_safe(["host", (ip,), "2>/dev/null | head -1"])
+        data["rdns"] = rdns.strip().rstrip(".") if rdns else "(no reverse DNS)"
         self._log(f"  Reverse DNS: {data['rdns']}")
 
         # Ping reachability
-        _, _, rc = _run(f"ping -c 1 -W 2 {ip} 2>/dev/null")
-        data['reachable'] = rc == 0
+        _, _, rc = run_safe(["ping -c 1 -W 2", (ip,), "2>/dev/null"])
+        data["reachable"] = rc == 0
         self._log(f"  Reachable: {'Yes' if data['reachable'] else 'No (filtered/offline)'}")
 
         # Traceroute (fast, 5 hops max)
-        trace, _, _ = _run(f"traceroute -m 5 -w 1 {ip} 2>/dev/null | tail -5")
-        data['traceroute'] = trace
+        trace, _, _ = run_safe(["traceroute -m 5 -w 1", (ip,), "2>/dev/null | tail -5"])
+        data["traceroute"] = trace
         if trace:
             self._log(f"  Traceroute (last 5 hops):\n{trace}")
 
         return data
 
     def _reverse_dns(self, ip, findings):
-        rdns, _, _ = _run(f"dig +short -x {ip} 2>/dev/null | head -3")
+        rdns, _, _ = run_safe(["dig +short -x", (ip,), "2>/dev/null | head -3"])
         if rdns:
             self._log(f"  PTR records: {rdns}")
             # Check for suspicious hostnames
             rdns_lower = rdns.lower()
-            if any(x in rdns_lower for x in ['tor', 'exit', 'relay', 'vpn', 'proxy']):
-                findings.append({
-                    'level': 'HIGH',
-                    'title': f'Reverse DNS suggests TOR/VPN exit node',
-                    'desc':  f'PTR record: {rdns.strip()} — this IP appears to be an anonymisation node',
-                })
+            if any(x in rdns_lower for x in ["tor", "exit", "relay", "vpn", "proxy"]):
+                findings.append(
+                    {
+                        "level": "HIGH",
+                        "title": f"Reverse DNS suggests TOR/VPN exit node",
+                        "desc": f"PTR record: {rdns.strip()} — this IP appears to be an anonymisation node",
+                    }
+                )
 
     def _do_whois(self, target):
         self._log(f"Running WHOIS for {target}...")
-        whois_out, _, rc = _run(f"whois {target} 2>/dev/null", timeout=12)
+        whois_out, _, rc = run_safe(["whois", (target,), "2>/dev/null"], timeout=12)
         if rc == 0 and whois_out:
             # Filter to most useful lines
             useful = []
-            keys = ['netname','country','orgname','org-name','organisation',
-                    'descr','abuse','notify','route','cidr','netrange',
-                    'originas','inetnum','created','last-modified',
-                    'registrar','creation date','updated date']
-            for line in whois_out.split('\n'):
+            keys = [
+                "netname",
+                "country",
+                "orgname",
+                "org-name",
+                "organisation",
+                "descr",
+                "abuse",
+                "notify",
+                "route",
+                "cidr",
+                "netrange",
+                "originas",
+                "inetnum",
+                "created",
+                "last-modified",
+                "registrar",
+                "creation date",
+                "updated date",
+            ]
+            for line in whois_out.split("\n"):
                 ll = line.lower()
-                if any(k in ll for k in keys) and ':' in line:
+                if any(k in ll for k in keys) and ":" in line:
                     useful.append(line.strip())
-            output = '\n'.join(useful[:30]) if useful else whois_out[:800]
+            output = "\n".join(useful[:30]) if useful else whois_out[:800]
         else:
-            output = 'whois not available — install with: sudo apt install whois'
+            output = "whois not available — install with: sudo apt install whois"
 
         self._safe_after(0, self._show_whois, output)
 
@@ -430,21 +465,21 @@ class InvestigateScreen(ctk.CTkFrame):
         if _is_private_ip(ip):
             return
         self._log(f"Quick port scan of {ip} (top ports)...")
-        nmap, _, rc = _run(f"nmap -T4 --open -F {ip} 2>/dev/null", timeout=30)
+        nmap, _, rc = run_safe(["nmap -T4 --open -F", (ip,), "2>/dev/null"], timeout=30)
         if rc == 0 and nmap:
-            open_ports = re.findall(r'(\d+)/tcp\s+open\s+(\S+)', nmap)
+            open_ports = re.findall(r"(\d+)/tcp\s+open\s+(\S+)", nmap)
             if open_ports:
                 self._log(f"  Open ports: {', '.join(f'{p}/{s}' for p,s in open_ports[:10])}")
-                dangerous = {'23':'Telnet','4444':'Metasploit','1337':'Hacker',
-                             '3389':'RDP','5900':'VNC','6667':'IRC'}
+                dangerous = {"23": "Telnet", "4444": "Metasploit", "1337": "Hacker", "3389": "RDP", "5900": "VNC", "6667": "IRC"}
                 for port, svc in open_ports:
                     if port in dangerous:
-                        findings.append({
-                            'level': 'HIGH',
-                            'title': f'Dangerous service on remote host: port {port} ({svc})',
-                            'desc':  f'Port {port} ({dangerous[port]}) is open on {ip} — '
-                                     f'this service is commonly exploited',
-                        })
+                        findings.append(
+                            {
+                                "level": "HIGH",
+                                "title": f"Dangerous service on remote host: port {port} ({svc})",
+                                "desc": f"Port {port} ({dangerous[port]}) is open on {ip} — " f"this service is commonly exploited",
+                            }
+                        )
             else:
                 self._log("  No open ports found (may be firewalled)")
         else:
@@ -453,90 +488,85 @@ class InvestigateScreen(ctk.CTkFrame):
     # ── System investigation modes ────────────────────────────
 
     def _investigate_system(self, mode, findings):
-        if mode == 'connections':
+        if mode == "connections":
             self._log("Analysing all active network connections...")
             out, _, _ = _run("ss -tnp state established 2>/dev/null")
             self._log(f"Active connections:\n{out}")
             # Extract external IPs
-            ips = re.findall(r'(\d+\.\d+\.\d+\.\d+):\d+\s+users', out)
+            ips = re.findall(r"(\d+\.\d+\.\d+\.\d+):\d+\s+users", out)
             external = [ip for ip in set(ips) if not _is_private_ip(ip)]
             if external:
                 self._log(f"External IPs to investigate: {', '.join(external[:5])}")
                 for ip in external[:3]:
-                    findings.append({
-                        'level': 'INFO',
-                        'title': f'Active connection to external IP: {ip}',
-                        'desc':  f'Tap the field above and enter {ip} to investigate this IP',
-                    })
-            self._safe_after(0, self._show_whois,
-                       f"Active connections:\n{out}\n\nExternal IPs: {', '.join(external)}")
+                    findings.append(
+                        {
+                            "level": "INFO",
+                            "title": f"Active connection to external IP: {ip}",
+                            "desc": f"Tap the field above and enter {ip} to investigate this IP",
+                        }
+                    )
+            self._safe_after(0, self._show_whois, f"Active connections:\n{out}\n\nExternal IPs: {', '.join(external)}")
 
-        elif mode == 'ports':
+        elif mode == "ports":
             self._log("Analysing all open ports...")
             out, _, _ = _run("ss -tlnp 2>/dev/null")
             self._log(f"Open ports:\n{out}")
-            dangerous = {'23':'Telnet','4444':'Metasploit','1337':'Hacker','5555':'ADB-Net'}
-            ports = re.findall(r':(\d+)\s', out)
+            dangerous = {"23": "Telnet", "4444": "Metasploit", "1337": "Hacker", "5555": "ADB-Net"}
+            ports = re.findall(r":(\d+)\s", out)
             for port in set(ports):
                 if port in dangerous:
-                    findings.append({
-                        'level': 'HIGH',
-                        'title': f'Dangerous port open locally: :{port} ({dangerous[port]})',
-                        'desc':  f'This port is associated with {dangerous[port]}. Close it immediately.',
-                    })
+                    findings.append(
+                        {
+                            "level": "HIGH",
+                            "title": f"Dangerous port open locally: :{port} ({dangerous[port]})",
+                            "desc": f"This port is associated with {dangerous[port]}. Close it immediately.",
+                        }
+                    )
             self._safe_after(0, self._show_whois, f"Open ports:\n{out}")
 
-        elif mode == 'processes':
+        elif mode == "processes":
             self._log("Analysing running processes for threats...")
             out, _, _ = _run("ps aux --sort=-%cpu 2>/dev/null | head -20")
             self._log(f"Top processes:\n{out}")
-            suspicious = ['nc ','netcat','ncat','socat','msfconsole','hydra',
-                          'john ','hashcat','mimikatz','empire','cobaltstrike']
+            suspicious = ["nc ", "netcat", "ncat", "socat", "msfconsole", "hydra", "john ", "hashcat", "mimikatz", "empire", "cobaltstrike"]
             for name in suspicious:
                 if name.lower() in out.lower():
-                    pid_line = [l for l in out.split('\n') if name.lower() in l.lower()]
-                    findings.append({
-                        'level': 'HIGH',
-                        'title': f'Suspicious process: {name.strip()}',
-                        'desc':  f'Known hacking tool is running: {pid_line[0][:100] if pid_line else ""}',
-                    })
+                    pid_line = [l for l in out.split("\n") if name.lower() in l.lower()]
+                    findings.append(
+                        {
+                            "level": "HIGH",
+                            "title": f"Suspicious process: {name.strip()}",
+                            "desc": f"Known hacking tool is running: {pid_line[0][:100] if pid_line else ''}",
+                        }
+                    )
             self._safe_after(0, self._show_whois, f"Running processes:\n{out}")
 
     def _investigate_port(self, port, findings):
         self._log(f"Investigating port {port}...")
         # Who is listening on this port?
-        out, _, _ = _run(f"ss -tlnp 2>/dev/null | grep :{port}")
+        out, _, _ = run_safe(["ss -tlnp 2>/dev/null | grep", (f":{port}",)])
         if out:
             self._log(f"  Process on :{port}: {out}")
-            findings.append({
-                'level': 'INFO',
-                'title': f'Port :{port} is open locally',
-                'desc':  out[:200],
-            })
+            findings.append({"level": "INFO", "title": f"Port :{port} is open locally", "desc": out[:200]})
         # What connections exist on this port?
-        conns, _, _ = _run(f"ss -tnp 2>/dev/null | grep :{port}")
+        conns, _, _ = run_safe(["ss -tnp 2>/dev/null | grep", (f":{port}",)])
         if conns:
             self._log(f"  Active connections on :{port}:\n{conns}")
-        self._safe_after(0, self._show_whois,
-                   f"Port :{port} analysis:\n\nListening:\n{out}\n\nConnections:\n{conns}")
+        self._safe_after(0, self._show_whois, f"Port :{port} analysis:\n\nListening:\n{out}\n\nConnections:\n{conns}")
 
     def _investigate_process(self, name, findings):
         self._log(f"Investigating process: {name}")
-        out, _, _ = _run(f"ps aux | grep -i {name} | grep -v grep")
+        out, _, _ = run_safe(["ps aux | grep -i", (name,), "| grep -v grep"])
         if out:
             self._log(f"  Process found:\n{out}")
             # Get open files/connections for this process
-            pid_match = re.search(r'\S+\s+(\d+)', out)
+            pid_match = re.search(r"\S+\s+(\d+)", out)
             if pid_match:
                 pid = pid_match.group(1)
-                lsof, _, _ = _run(f"lsof -p {pid} -i 2>/dev/null | head -10")
+                lsof, _, _ = run_safe(["lsof -p", (pid,), "-i 2>/dev/null | head -10"])
                 if lsof:
                     self._log(f"  Network connections:\n{lsof}")
-                findings.append({
-                    'level': 'INFO',
-                    'title': f'Process found: {name} (PID {pid})',
-                    'desc':  out[:200],
-                })
+                findings.append({"level": "INFO", "title": f"Process found: {name} (PID {pid})", "desc": out[:200]})
         else:
             self._log(f"  No process named '{name}' found")
         self._safe_after(0, self._show_whois, f"Process analysis: {name}\n\n{out}")
@@ -748,16 +778,16 @@ class InvestigateScreen(ctk.CTkFrame):
 
     def _block_ip(self, ip):
         self._log(f"Blocking {ip} with UFW...")
+
         def _do():
-            out, err, rc = _run(f"sudo ufw deny from {ip} 2>/dev/null")
+            out, err, rc = run_safe(["sudo ufw deny from", (ip,), "2>/dev/null"])
             msg = f"✓ Blocked {ip}" if rc == 0 else f"✗ Failed: {err[:60]}"
             self._safe_after(0, self._log, msg)
+
         threading.Thread(target=_do, daemon=True).start()
 
     def _copy(self, text):
-        try:
-            subprocess.run(f"echo '{text}' | xclip -selection clipboard",
-                           shell=True, timeout=3)
+        if copy_to_clipboard(text):
             self._log(f"Copied: {text}")
-        except Exception:
-            self._log(f"Copy: {text}")
+        else:
+            self._log(f"Failed to copy: {text}")

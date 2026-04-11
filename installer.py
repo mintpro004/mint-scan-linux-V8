@@ -5,9 +5,8 @@ Works on Chromebook (passwordless sudo), Ubuntu, Kali, WSL2.
 """
 import tkinter as tk
 import customtkinter as ctk
-import subprocess, threading, time, os, sys, shutil, shlex
+import subprocess, threading, time, os, sys, shutil
 from widgets import C, MONO_SM, Btn
-from utils import run_cmd
 
 
 class InstallerPopup(ctk.CTkToplevel):
@@ -113,7 +112,7 @@ class InstallerPopup(ctk.CTkToplevel):
             self._set_status(f"Step {i+1} of {total}...")
             self._log_line(f"\n$ {cmd}")
             self._log_line("─" * 58)
-            ok = self._execute_step(cmd)
+            ok = self._run_cmd(cmd)
             if not ok:
                 failed.append(cmd)
                 self._log_line(f"⚠ Step {i+1} had errors — continuing...")
@@ -140,18 +139,23 @@ class InstallerPopup(ctk.CTkToplevel):
         if self._on_done:
             self.after(500, self._on_done)
 
-    def _execute_step(self, cmd):
+    def _run_cmd(self, cmd):
         """
-        Run one command with streaming output using the centralized run_cmd
-        concept but adapted for streaming.
+        Run one command with streaming output.
+        Handles sudo correctly for Chromebook — uses sudo -n (passwordless).
         """
         original = cmd.strip()
-        
-        # Hardened sudo handling for streaming
+
+        # Build the actual command to run
         if original.startswith('sudo ') and os.geteuid() != 0:
             inner   = original[5:].strip()
-            # Wrap in bash -c with proper escaping using shlex
-            run_cmd_str = f"sudo -n bash -c {shlex.quote(inner)}"
+            inner_q = inner.replace("'", "'\\''")
+            # Try passwordless sudo first (-n), fall back to interactive sudo
+            # On Chromebook, sudo is passwordless so -n always works
+            run_cmd_str = (
+                f"sudo -n bash -c '{inner_q}' 2>/tmp/mint_sudo_err || "
+                f"sudo bash -c '{inner_q}'"
+            )
         else:
             run_cmd_str = original
 
@@ -169,10 +173,6 @@ class InstallerPopup(ctk.CTkToplevel):
                 if line:
                     self._log_line(line)
             proc.wait()
-            
-            if proc.returncode != 0:
-                self._log_line(f"Command exited with code {proc.returncode}")
-                
             return proc.returncode == 0
         except Exception as e:
             self._log_line(f"Error: {e}")

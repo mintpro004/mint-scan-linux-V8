@@ -3,7 +3,7 @@ import tkinter as tk
 import customtkinter as ctk
 import threading, subprocess, re, os
 from widgets import ScrollableFrame, Card, SectionHeader, InfoGrid, ResultBox, Btn, C, MONO, MONO_SM
-from utils import run_cmd as run, get_wifi_networks, get_current_wifi, copy_to_clipboard
+from utils import run_cmd as run, run_safe, get_wifi_networks, get_current_wifi, copy_to_clipboard
 
 
 def sig_color(sig):
@@ -200,10 +200,10 @@ class WifiScreen(ctk.CTkFrame):
         ifaces_out, _, _ = run("ip link show 2>/dev/null")
         for iface in re.findall(r'\d+: (\w+):', ifaces_out):
             if any(x in iface.lower() for x in ['tun','tap','wg','vpn','ppp','zt','tor']):
-                ip_out, _, _ = run(f"ip addr show {iface} 2>/dev/null | grep 'inet ' | awk '{{print $2}}'")
+                ip_out, _, _ = run_safe(["ip addr show", (iface,), "2>/dev/null | grep 'inet ' | awk '{print $2}'"])
                 vpn_ifaces.append({'name': iface, 'ip': ip_out or '—'})
         for proc in ['openvpn','wireguard','nordvpn','expressvpn','tailscale','zerotier']:
-            out, _, rc = run(f"pgrep -x {proc} 2>/dev/null")
+            out, _, rc = run_safe(["pgrep -x", (proc,), "2>/dev/null"])
             if rc == 0: vpn_procs.append(proc)
         self._safe_after(0, self._render_vpn, vpn_ifaces, vpn_procs)
         if not self._scanning: return
@@ -285,7 +285,7 @@ class WifiScreen(ctk.CTkFrame):
             self.status_lbl.configure(text="Saved networks copied to clipboard", text_color=C['ok'])
 
     def _show_password(self, name):
-        out, _, rc = run(f"sudo nmcli -s -g 802-11-wireless-security.psk connection show '{name}' 2>/dev/null")
+        out, _, rc = run_safe(["sudo nmcli -s -g 802-11-wireless-security.psk connection show", (name,), "2>/dev/null"])
         popup = ctk.CTkToplevel(self)
         popup.title(f"Password: {name}")
         popup.geometry("420x200")

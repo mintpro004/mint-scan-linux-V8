@@ -8,42 +8,37 @@ import threading
 import time
 import shutil
 import shlex
-import secrets
 from logger import get_logger as _get_logger
 _log = _get_logger("utils")
 
 # Import colours and fonts from widgets (single source of truth)
 from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 
-_auth_token = secrets.token_hex(8)
 
-def get_auth_token():
-    return _auth_token
-
-def run_cmd(cmd, timeout=10, use_sudo=False):
+def run_cmd(cmd, timeout=8):
     """
-    Unified, hardened command runner.
-    - Uses shlex for safe quoting.
-    - Prevents sudo hangs by using sudo -n (non-interactive).
-    - Centralizes execution logic for the entire app.
+    Run a shell command safely.
+    Uses sudo -n (passwordless) so commands work on Chromebook/Crostini.
+    Sets DEBIAN_FRONTEND=noninteractive for apt commands.
     """
-    if use_sudo and not cmd.startswith('sudo ') and os.geteuid() != 0:
-        cmd = f"sudo {cmd}"
+    if isinstance(cmd, list):
+        # Convert list to a safe shell string
+        cmd = " ".join(shlex.quote(arg) for arg in cmd)
 
     original_cmd = cmd
-    
-    # Hardened sudo handling: Use sudo -n to avoid hanging on password prompts.
-    # If sudo -n fails, we return the error immediately rather than hanging.
+
+    # For sudo commands: use sudo -n (non-interactive) first,
+    # fall back to plain sudo (user may have passwordless sudo configured)
+    # sudo -n = non-interactive; works with Chromebook passwordless sudo
     if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
-        # Split 'sudo ' from the rest
-        parts = cmd.strip().split(None, 1)
-        if len(parts) > 1:
-            inner_cmd = parts[1]
-            # Wrap in bash -c with proper escaping
-            cmd = f"sudo -n bash -c {shlex.quote(inner_cmd)}"
-        else:
-            # Just 'sudo' without command, return error
-            return '', 'Invalid sudo command', 1
+        inner = cmd.strip()[5:].strip()
+        # Use shlex.quote for more robust escaping if it was just a string
+        # but wait, if it's already a complex command string with its own quotes
+        # we might break it if we shlex.quote(inner) as a whole.
+        # The original implementation's inner.replace("'", "'\\''") is actually
+        # the correct way to escape for a bash -c '...' string.
+        inner_q = inner.replace("'", "'\\''")
+        cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
 
     run_env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
 
@@ -51,23 +46,41 @@ def run_cmd(cmd, timeout=10, use_sudo=False):
         r = subprocess.run(
             cmd, shell=True, capture_output=True,
             text=True, timeout=timeout, env=run_env)
-        
-        stdout = r.stdout.strip() if r.stdout else ""
-        stderr = r.stderr.strip() if r.stderr else ""
-        
-        if r.returncode != 0:
-            if "sudo: a password is required" in stderr.lower() or "sudo: a password is required" in stdout.lower():
-                stderr = "Authentication required (sudo password). Run 'sudo -v' in terminal first or use a passwordless sudo user."
-            _log.debug(f"cmd [{r.returncode}]: {stderr[:120]}")
-            
-        return stdout, stderr, r.returncode
+        if r.returncode != 0 and r.stderr.strip():
+            _log.debug(f'cmd [{r.returncode}]: {r.stderr.strip()[:120]}')
+        return r.stdout.strip(), r.stderr.strip(), r.returncode
 
     except subprocess.TimeoutExpired:
-        _log.warning(f"Timeout ({timeout}s): {original_cmd[:80]}")
-        return '', f'Command timed out after {timeout}s', 124
+        _log.warning(f'Timeout ({timeout}s): {original_cmd[:80]}')
+        return '', f'timeout after {timeout}s', 1
+
+    except FileNotFoundError as e:
+        _log.error(f'Not found: {e}')
+        return '', str(e), 127
+
+    except PermissionError as e:
+        _log.error(f'Permission denied: {e}')
+        return '', str(e), 126
+
     except Exception as e:
-        _log.error(f"run_cmd error: {e}")
+        _log.error(f'run_cmd error: {e}')
         return '', str(e), 1
+
+
+def run_safe(parts, timeout=8):
+    """
+    Execute a command formed from parts. Parts can be strings (literal)
+    or tuples (value_to_quote,).
+    Example: run_safe(["ls -la", (path,)]) -> ls -la '/path with spaces'
+    """
+    cmd_str = ""
+    for part in parts:
+        if isinstance(part, tuple):
+            cmd_str += shlex.quote(str(part[0]))
+        else:
+            cmd_str += str(part)
+        cmd_str += " "
+    return run_cmd(cmd_str.strip(), timeout=timeout)
 
 
 def get_public_ip_info():
@@ -104,7 +117,7 @@ def get_hostname():
 
 def ping(host='1.1.1.1', count=1):
     """Real ICMP ping — returns avg ms or None."""
-    out, _, rc = run_cmd(f'ping -c {count} -W 2 {host}')
+    out, _, rc = run_safe(['ping -c', (count,), '-W 2', (host,)])
     if rc == 0:
         m = re.search(r'avg.*?([\d.]+)', out)
         if m:
@@ -193,7 +206,7 @@ def get_wifi_networks():
     # Fallback: iwlist scan
     iface = get_wifi_interface()
     if iface:
-        out, _, rc = run_cmd(f'sudo iwlist {iface} scan 2>/dev/null')
+        out, _, rc = run_safe(['sudo iwlist', (iface,), 'scan 2>/dev/null'])
         if rc == 0 and 'ESSID' in out:
             cells = out.split('Cell ')
             for cell in cells[1:]:
@@ -341,7 +354,7 @@ def get_system_info():
 
 def get_processes(top_n=20):
     """Get top processes by CPU usage."""
-    out, _, _ = run_cmd(f"ps aux --sort=-%cpu | head -{top_n+1} 2>/dev/null")
+    out, _, _ = run_safe(["ps aux --sort=-%cpu | head -n", (top_n+1,), "2>/dev/null"])
     procs = []
     for line in out.strip().split('\n')[1:]:
         parts = line.split(None, 10)

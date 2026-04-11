@@ -12,7 +12,7 @@ import os, threading, time, subprocess, shutil, json
 import customtkinter as ctk
 from widgets import (C, MONO, MONO_SM, ScrollableFrame, Card,
                      SectionHeader, Btn, InfoGrid)
-from utils import run_cmd
+from utils import run_cmd, run_safe
 from logger import get_logger
 
 log = get_logger('ids')
@@ -425,98 +425,124 @@ class IDSScreen(ctk.CTkFrame):
 
     def _start_suricata(self):
         iface = self._get_iface()
-        log.info(f'Starting Suricata on {iface}')
-        self._rule_status.configure(text=f'Starting Suricata on {iface}...', text_color=C['ac'])
+        log.info(f"Starting Suricata on {iface}")
+        self._rule_status.configure(text=f"Starting Suricata on {iface}...", text_color=C["ac"])
+
         def _bg():
-            run_cmd('sudo mkdir -p /var/log/suricata', timeout=5)
+            run_cmd("sudo mkdir -p /var/log/suricata", timeout=5)
             # Use --af-packet for best performance on Linux
-            out, err, rc = run_cmd(
-                f'sudo suricata --af-packet={iface} -D '
-                f'--pidfile /var/run/suricata.pid '
-                f'-l /var/log/suricata/ 2>&1',
-                timeout=30)
-            result = (out or err or f'exit={rc}')[:100]
-            ok = rc == 0 or 'daemon' in result.lower() or 'pid' in result.lower()
-            self._safe_after(0, self._rule_status.configure, {
-                'text': ('✓ Suricata started' if ok else f'✗ {result}'),
-                'text_color': C['ok'] if ok else C['wn']})
-            log.info(f'Suricata start: {result}')
-            self._safe_after(800, lambda: threading.Thread(
-                target=self._bg_refresh, daemon=True).start())
+            out, err, rc = run_safe(
+                [
+                    "sudo suricata --af-packet=",
+                    (iface,),
+                    "-D --pidfile /var/run/suricata.pid -l /var/log/suricata/ 2>&1",
+                ],
+                timeout=30,
+            )
+            result = (out or err or f"exit={rc}")[:100]
+            ok = rc == 0 or "daemon" in result.lower() or "pid" in result.lower()
+            self._safe_after(
+                0,
+                self._rule_status.configure,
+                {
+                    "text": ("✓ Suricata started" if ok else f"✗ {result}"),
+                    "text_color": C["ok"] if ok else C["wn"],
+                },
+            )
+            log.info(f"Suricata start: {result}")
+            self._safe_after(800, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
+
         threading.Thread(target=_bg, daemon=True).start()
 
     def _stop_suricata(self):
         def _bg():
-            run_cmd('sudo killall suricata 2>/dev/null', timeout=8)
-            run_cmd('sudo rm -f /var/run/suricata.pid', timeout=5)
-            log.info('Suricata stopped')
-            self._safe_after(500, lambda: threading.Thread(
-                target=self._bg_refresh, daemon=True).start())
+            run_cmd("sudo killall suricata 2>/dev/null", timeout=8)
+            run_cmd("sudo rm -f /var/run/suricata.pid", timeout=5)
+            log.info("Suricata stopped")
+            self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
+
         threading.Thread(target=_bg, daemon=True).start()
 
     def _sur_status(self):
         def _bg():
-            out, _, _ = run_cmd('sudo suricata --list-runmodes 2>/dev/null | head -5', timeout=5)
-            svc, _, _ = run_cmd('systemctl status suricata 2>/dev/null | head -8', timeout=5)
-            text = (out or svc or 'Suricata status unavailable')[:200]
-            self._safe_after(0, self._rule_status.configure,
-                             {'text': text, 'text_color': C['ac']})
+            out, _, _ = run_cmd("sudo suricata --list-runmodes 2>/dev/null | head -5", timeout=5)
+            svc, _, _ = run_cmd("systemctl status suricata 2>/dev/null | head -8", timeout=5)
+            text = (out or svc or "Suricata status unavailable")[:200]
+            self._safe_after(0, self._rule_status.configure, {"text": text, "text_color": C["ac"]})
+
         threading.Thread(target=_bg, daemon=True).start()
 
     def _update_rules(self):
-        self._rule_status.configure(text='Updating Suricata rules...', text_color=C['ac'])
+        self._rule_status.configure(text="Updating Suricata rules...", text_color=C["ac"])
+
         def _bg():
-            out, err, rc = run_cmd('sudo suricata-update 2>&1', timeout=180)
-            result = (out or err or f'exit={rc}')[-200:]
-            self._safe_after(0, self._rule_status.configure, {
-                'text': ('✓ Rules updated' if rc == 0 else f'✗ {result[:80]}'),
-                'text_color': C['ok'] if rc == 0 else C['wn']})
+            out, err, rc = run_cmd("sudo suricata-update 2>&1", timeout=180)
+            result = (out or err or f"exit={rc}")[-200:]
+            self._safe_after(
+                0,
+                self._rule_status.configure,
+                {
+                    "text": ("✓ Rules updated" if rc == 0 else f"✗ {result[:80]}"),
+                    "text_color": C["ok"] if rc == 0 else C["wn"],
+                },
+            )
+
         threading.Thread(target=_bg, daemon=True).start()
 
     def _start_snort(self):
         iface = self._get_iface()
-        log.info(f'Starting Snort on {iface}')
+        log.info(f"Starting Snort on {iface}")
+
         def _bg():
-            run_cmd('sudo mkdir -p /var/log/snort', timeout=5)
-            conf = '/etc/snort/snort.conf'
+            run_cmd("sudo mkdir -p /var/log/snort", timeout=5)
+            conf = "/etc/snort/snort.conf"
             if os.path.exists(conf):
-                cmd = f'sudo snort -D -i {iface} -A fast -l /var/log/snort/ -c {conf} 2>&1'
+                parts = ["sudo snort -D -i", (iface,), "-A fast -l /var/log/snort/ -c", (conf,), "2>&1"]
             else:
                 # Basic mode without config — still works for detection
-                cmd = f'sudo snort -D -i {iface} -A fast -l /var/log/snort/ 2>&1'
-            out, err, rc = run_cmd(cmd, timeout=25)
-            result = (out or err or f'exit={rc}')[:100]
+                parts = ["sudo snort -D -i", (iface,), "-A fast -l /var/log/snort/ 2>&1"]
+            out, err, rc = run_safe(parts, timeout=25)
+            result = (out or err or f"exit={rc}")[:100]
             ok = rc == 0
-            log.info(f'Snort start: {result}')
-            self._safe_after(0, self._rule_status.configure, {
-                'text': ('✓ Snort started' if ok else f'✗ {result}'),
-                'text_color': C['ok'] if ok else C['wn']})
-            self._safe_after(800, lambda: threading.Thread(
-                target=self._bg_refresh, daemon=True).start())
+            log.info(f"Snort start: {result}")
+            self._safe_after(
+                0,
+                self._rule_status.configure,
+                {
+                    "text": ("✓ Snort started" if ok else f"✗ {result}"),
+                    "text_color": C["ok"] if ok else C["wn"],
+                },
+            )
+            self._safe_after(800, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
+
         threading.Thread(target=_bg, daemon=True).start()
 
     def _stop_snort(self):
-        run_cmd('sudo killall snort 2>/dev/null', timeout=8)
+        run_cmd("sudo killall snort 2>/dev/null", timeout=8)
         threading.Thread(target=self._bg_refresh, daemon=True).start()
 
     def _test_rule(self):
         rule = self._rule_entry.get().strip()
         if not rule:
             return
-        if not shutil.which('suricata'):
-            self._rule_status.configure(text='Suricata not installed', text_color=C['wn'])
+        if not shutil.which("suricata"):
+            self._rule_status.configure(text="Suricata not installed", text_color=C["wn"])
             return
-        self._rule_status.configure(text='Testing rule...', text_color=C['ac'])
+        self._rule_status.configure(text="Testing rule...", text_color=C["ac"])
+
         def _bg():
-            tmp = '/tmp/mint_scan_test.rules'
-            with open(tmp, 'w') as f:
-                f.write(rule + '\n')
-            out, err, rc = run_cmd(f'suricata -T -S {tmp} 2>&1', timeout=20)
-            result = (out or err or 'No output')[:150]
-            ok = rc == 0 or 'successfully loaded' in result.lower()
-            self._safe_after(0, self._rule_status.configure, {
-                'text': '✓ Rule syntax valid' if ok else f'✗ {result}',
-                'text_color': C['ok'] if ok else C['wn']})
+            tmp = "/tmp/mint_scan_test.rules"
+            with open(tmp, "w") as f:
+                f.write(rule + "\n")
+            out, err, rc = run_safe(["suricata -T -S", (tmp,), "2>&1"], timeout=20)
+            result = (out or err or "No output")[:150]
+            ok = rc == 0 or "successfully loaded" in result.lower()
+            self._safe_after(
+                0,
+                self._rule_status.configure,
+                {"text": "✓ Rule syntax valid" if ok else f"✗ {result}", "text_color": C["ok"] if ok else C["wn"]},
+            )
+
         threading.Thread(target=_bg, daemon=True).start()
 
     def _install(self, pkg: str, check_bin: str):

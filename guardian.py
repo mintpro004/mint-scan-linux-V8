@@ -7,7 +7,7 @@ import customtkinter as ctk
 import threading, subprocess, time, os
 from widgets import (ScrollableFrame, Card, SectionHeader,
                      InfoGrid, ResultBox, Btn, C, MONO, MONO_SM)
-from utils import run_cmd
+from utils import run_cmd, run_safe
 from logger import get_logger
 from notifier import critical, warning
 
@@ -262,7 +262,7 @@ class GuardianScreen(ctk.CTkFrame):
         for iface in ifaces_out.splitlines():
             iface = iface.strip()
             if iface and iface != 'lo':
-                run_cmd(f'sudo ip link set {iface} down 2>/dev/null || true', timeout=3)
+                run_safe(["sudo ip link set", (iface,), "down 2>/dev/null || true"], timeout=3)
         # Lock screen
         run_cmd('loginctl lock-session 2>/dev/null || xdg-screensaver lock 2>/dev/null || true', timeout=3)
         self._glog_line('☢ PANIC EXECUTED — network killed, screen locked')

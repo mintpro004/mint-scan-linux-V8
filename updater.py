@@ -123,37 +123,34 @@ def do_git_update(log_fn=None):
         _l('  Run:  git clone https://github.com/mintpro004/mint-scan-linux-V8.git')
         return False
 
-    _l('Fixing ownership...')
+    _l("Fixing ownership...")
     from utils import run_cmd as _rc
-    _rc(f'sudo chown -R $USER:$USER "{BASE_DIR}"', timeout=15)
 
-    _l('Fetching from GitHub...')
-    r = subprocess.run('git fetch origin', shell=True,
-                       capture_output=True, text=True, cwd=BASE_DIR, timeout=60)
-    _l(r.stdout.strip() or '(no output)')
+    _rc(["sudo", "chown", "-R", f"{os.getlogin()}:{os.getlogin()}", BASE_DIR], timeout=15)
+
+    _l("Fetching from GitHub...")
+    r = subprocess.run(["git", "fetch", "origin"], capture_output=True, text=True, cwd=BASE_DIR, timeout=60)
+    _l(r.stdout.strip() or "(no output)")
     if r.returncode != 0:
-        _l(f'Fetch failed: {r.stderr.strip()}')
+        _l(f"Fetch failed: {r.stderr.strip()}")
         return False
 
-    _l('Pulling latest commits...')
-    r = subprocess.run('git pull origin main --rebase',
-                       shell=True, capture_output=True, text=True,
-                       cwd=BASE_DIR, timeout=120)
+    _l("Pulling latest commits...")
+    r = subprocess.run(["git", "pull", "origin", "main", "--rebase"], capture_output=True, text=True, cwd=BASE_DIR, timeout=120)
     for line in (r.stdout + r.stderr).splitlines():
         _l(line)
 
     if r.returncode != 0:
-        _l('Pull failed — running self-heal...')
-        subprocess.run('bash install.sh', shell=True, cwd=BASE_DIR)
+        _l("Pull failed — running self-heal...")
+        subprocess.run(["bash", "install.sh"], cwd=BASE_DIR)
         return False
 
-    _l('Updating Python packages...')
-    venv_pip = os.path.join(BASE_DIR, 'venv', 'bin', 'pip')
+    _l("Updating Python packages...")
+    venv_pip = os.path.join(BASE_DIR, "venv", "bin", "pip")
     if os.path.exists(venv_pip):
-        subprocess.run(f'{venv_pip} install -r requirements.txt -q',
-                       shell=True, cwd=BASE_DIR, capture_output=True)
+        _rc([venv_pip, "install", "-r", "requirements.txt", "-q"], timeout=180)
 
-    _l('✓ Update complete — restart Mint Scan to apply.')
+    _l("✓ Update complete — restart Mint Scan to apply.")
     return True
 
 
