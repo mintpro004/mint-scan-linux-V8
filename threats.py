@@ -7,7 +7,6 @@ import customtkinter as ctk
 import threading, os, re, subprocess, time, queue
 from widgets import ScrollableFrame, Card, SectionHeader, ResultBox, Btn, InfoGrid, C, MONO, MONO_SM
 from installer import InstallerPopup
-from utils import run_cmd as _r_utils
 
 KNOWN_BAD = {
     '23':'Telnet','4444':'Metasploit','1337':'Suspicious',
@@ -19,8 +18,20 @@ RISKY = {
 }
 
 def _r(cmd, timeout=10):
-    """Delegates to utils.run_cmd — single authoritative implementation."""
-    return _r_utils(cmd, timeout=timeout)
+    """Run command — Chromebook-safe sudo (no GUI polkit needed)."""
+    original = cmd.strip()
+    if original.startswith('sudo ') and os.geteuid() != 0:
+        inner = original[5:].strip()
+        inner_q = inner.replace("'", "'''")
+        cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
+    env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True,
+                           text=True, timeout=timeout, env=env)
+        return r.stdout.strip(), r.stderr.strip(), r.returncode
+    except Exception as e:
+        return '', str(e), 1
+
 
 class ThreatsScreen(ctk.CTkFrame):
     def __init__(self, parent, app):
