@@ -208,7 +208,9 @@ class BevelFrame(ctk.CTkFrame):
 class Card(ctk.CTkFrame):
     """
     Raised card with 3D bevel border: bright top edge, dark bottom edge.
-    Uses a gradient-simulated border via border_color on outer + inner frames.
+    Card IS the content surface — bevel layers are sibling frames managed
+    by a transparent outer shell stored on self._shell.
+    Children placed into Card() land directly on the styled content surface.
     """
     def __init__(self, parent, accent=None, **kwargs):
         fg = kwargs.pop('fg_color', C['sf'])
@@ -216,61 +218,68 @@ class Card(ctk.CTkFrame):
         kwargs.pop('border_color', None)
         kwargs.pop('border_width', None)
 
-        # Outer shadow shell (bottom-right dark)
-        super().__init__(
+        # Outer shadow shell (holds bevel layers + content, NOT a tkinter master for children)
+        self._shell = ctk.CTkFrame(
             parent,
             fg_color=C['brd'],
             corner_radius=cr + 2,
             border_width=0,
-            **kwargs
         )
-        # Top-left highlight ring
+
+        # Top-left highlight ring inside shell
         self._hl = ctk.CTkFrame(
-            self,
+            self._shell,
             fg_color=accent or C['brt'],
             corner_radius=cr + 1,
             border_width=0
         )
         self._hl.pack(fill='both', expand=True, padx=(1, 0), pady=(1, 0))
 
-        # Accent line (1px) if accent colour given
+        # Accent line (1px top) if accent colour given
         if accent:
             ctk.CTkFrame(self._hl, height=2,
                          fg_color=accent,
                          corner_radius=0).pack(fill='x', side='top')
 
-        # Content surface
-        self._surface = ctk.CTkFrame(
+        # Card IS the content surface — children pack into self directly
+        super().__init__(
             self._hl,
             fg_color=fg,
             corner_radius=cr,
             border_width=0
         )
-        self._surface.pack(fill='both', expand=True, padx=(0, 1), pady=(0, 1))
+        super().pack(fill='both', expand=True, padx=(0, 1), pady=(0, 1))
 
+    # pack/grid/place operate on the outer shell so the full bevel is positioned
     def pack(self, **kwargs):
-        super().pack(**kwargs)
+        self._shell.pack(**kwargs)
         return self
+
+    def pack_forget(self):
+        self._shell.pack_forget()
 
     def grid(self, **kwargs):
-        super().grid(**kwargs)
+        self._shell.grid(**kwargs)
         return self
 
-    # Delegate pack/grid/place for children to the inner surface
-    def __getattr__(self, name):
-        # Forward widget packing calls through to the surface
-        if name.startswith('_'):
-            raise AttributeError(name)
-        return getattr(self._surface, name)
+    def grid_forget(self):
+        self._shell.grid_forget()
 
-    # Allow children to be packed directly into Card by overriding
-    # tkinter's internal parent resolution
+    def place(self, **kwargs):
+        self._shell.place(**kwargs)
+        return self
+
+    def place_forget(self):
+        self._shell.place_forget()
+
+    def configure(self, **kwargs):
+        # Route fg_color to the content surface (self)
+        super().configure(**kwargs)
+
     @property
-    def _w(self):
-        try:
-            return self._surface._w
-        except Exception:
-            return super()._w
+    def interior(self):
+        """Convenience — Card itself is the content surface."""
+        return self
 
 
 # ── SectionHeader ─────────────────────────────────────────────────
