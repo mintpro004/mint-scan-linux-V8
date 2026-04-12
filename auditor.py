@@ -23,6 +23,10 @@ class AuditorScreen(ctk.CTkFrame):
             self._build()
             self._built = True
 
+    def on_blur(self):
+        """Called when switching away — no background threads to stop."""
+        pass
+
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
@@ -66,6 +70,7 @@ class AuditorScreen(ctk.CTkFrame):
         
         self.int_res = ResultBox(int_card, 'info', 'INTEGRITY STATUS', 'No baseline found. Create one first.')
         self.int_res.pack(fill='x', padx=8, pady=8)
+        self._int_card = int_card  # store ref for later updates
         
         b_row = ctk.CTkFrame(int_card, fg_color='transparent')
         b_row.pack(fill='x', padx=8, pady=(0,8))
@@ -129,8 +134,8 @@ class AuditorScreen(ctk.CTkFrame):
             with open(self._baseline_file, 'w') as f:
                 json.dump(hashes, f)
             self.int_res.destroy()
-            self.int_res = ResultBox(self.scroll, 'ok', 'BASELINE CREATED', f"Hashed {len(hashes)} binaries.")
-            self.int_res.pack(in_=self.scroll.winfo_children()[5], fill='x', padx=8, pady=8) # hacky access to parent card
+            self.int_res = ResultBox(self._int_card, 'ok', 'BASELINE CREATED', f"Hashed {len(hashes)} binaries.")
+            self.int_res.pack(fill='x', padx=8, pady=8)
         except Exception as e:
             pass
 
@@ -155,7 +160,7 @@ class AuditorScreen(ctk.CTkFrame):
                 changed.append(f"{b} (MISSING)")
         
         self.int_res.destroy()
-        parent = self.scroll.winfo_children()[-1] # Integrity card is last
+        parent = self._int_card  # use stored ref instead of fragile winfo_children[-1]
         if changed:
              self.int_res = ResultBox(parent, 'warn', 'INTEGRITY VIOLATION', f"Modified/Missing: {', '.join(changed)}")
         else:

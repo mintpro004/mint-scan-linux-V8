@@ -1,5 +1,8 @@
 # Mint Scan v8 — Python dependencies
-# Install via: pip install -r requirements.txt (handled by install.sh)
+# Install via: pip install -r requirements.txt  (handled by install.sh)
+#
+# System requirement: python3-tk must be installed via apt:
+#   sudo apt install python3-tk
 
 # Core UI
 customtkinter>=5.2.0
@@ -14,10 +17,10 @@ requests>=2.31.0
 netifaces>=0.11.0
 speedtest-cli>=2.1.3
 
-# Optional — system tray (install if desired)
+# Optional — system tray icon
 # pystray>=0.19.0
 
-# Optional — desktop notifications cross-platform fallback
+# Optional — desktop notifications (cross-platform fallback)
 # plyer>=2.1.0
 
 # Optional — PDF export for reports

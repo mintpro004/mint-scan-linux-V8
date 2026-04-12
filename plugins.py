@@ -125,6 +125,10 @@ class PluginScreen(ctk.CTkFrame):
             self._built = True
         self._refresh()
 
+    def on_blur(self):
+        """Called when switching away — no background threads to stop."""
+        pass
+
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
