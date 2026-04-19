@@ -258,13 +258,13 @@ class MarketplaceScreen(ctk.CTkFrame):
                 ).pack(anchor='w', padx=10, pady=(0, 6))
 
     def _load_catalogue(self):
-        self._safe_after(0, self._status_lbl.configure,
-                   {'text': 'Fetching from GitHub...', 'text_color': C['ac']})
+        self._safe_after(0, lambda: self._status_lbl.configure(
+            text='Fetching from GitHub…', text_color=C['ac']))
         self._catalogue = fetch_catalogue()
         self._safe_after(0, self._filter_catalogue)
-        self._safe_after(0, self._status_lbl.configure,
-                   {'text': f'{len(self._catalogue)} plugins available',
-                    'text_color': C['ok']})
+        count = len(self._catalogue)
+        self._safe_after(0, lambda: self._status_lbl.configure(
+            text=f'{count} plugin(s) available', text_color=C['ok']))
 
     def _filter_catalogue(self):
         try:

@@ -58,17 +58,25 @@ def run_cmd(cmd, timeout=8):
         return '', str(e), 1
 
 
+_ip_cache = {'data': {}, 'ts': 0.0}
+
 def get_public_ip_info():
-    """Fetch real public IP, ISP, city, country from ipapi.co."""
+    """Fetch public IP info from ipapi.co — cached for 5 minutes."""
+    now = time.time()
+    if _ip_cache['data'] and (now - _ip_cache['ts']) < 300:
+        return _ip_cache['data']
     try:
         import urllib.request
         req = urllib.request.Request(
             'https://ipapi.co/json/',
-            headers={'User-Agent': 'MintScan/8'})
+            headers={'User-Agent': 'MintScan/8.1'})
         with urllib.request.urlopen(req, timeout=6) as r:
-            return json.loads(r.read().decode())
+            data = json.loads(r.read().decode())
+        _ip_cache['data'] = data
+        _ip_cache['ts']   = now
+        return data
     except Exception:
-        return {}
+        return _ip_cache['data'] or {}
 
 
 def get_local_ip():

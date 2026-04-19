@@ -166,10 +166,16 @@ class WifiScreen(ctk.CTkFrame):
                         'Ethernet' if 'ethernet' in out.lower() else 'Unknown')
         signal = 0
         if connected:
+            # nmcli -t format is "ACTIVE:SIGNAL" per line e.g. "yes:72"
             sig_out, _, _ = run(
-                "nmcli -t -f ACTIVE,SIGNAL device wifi list 2>/dev/null | grep '^yes'")
-            m = re.search(r'yes:(\d+)', sig_out)
-            if m: signal = int(m.group(1))
+                "nmcli -t -f ACTIVE,SIGNAL device wifi list 2>/dev/null")
+            for line in sig_out.splitlines():
+                if line.startswith('yes:') or line.startswith('*:'):
+                    try:
+                        signal = int(line.split(':', 1)[1].strip())
+                    except Exception:
+                        pass
+                    break
         self._safe_after(0, self._render_current,
                          conn_type, ssid, ip_out.strip(), connected, signal)
 
@@ -381,10 +387,13 @@ class WifiScreen(ctk.CTkFrame):
             ResultBox(summary,'warn',f'⚠ {len(open_nets)} OPEN NETWORK(S)',
                       'Avoid sensitive data on open networks.'
                       ).pack(fill='x', padx=8, pady=(0,8))
-        curr,_,_ = run(
-            "nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null | "
-            "grep '^yes' | cut -d: -f2 | head -1")
-        curr = curr.strip()
+        curr_out,_,_ = run(
+            "nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null")
+        curr = ''
+        for _ln in curr_out.splitlines():
+            if _ln.startswith('yes:') or _ln.startswith('*:'):
+                curr = _ln.split(':',1)[1].strip()
+                break
         for net in networks:
             sec  = net['security'].upper()
             col  = sec_color(sec)

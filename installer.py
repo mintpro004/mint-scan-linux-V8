@@ -142,37 +142,70 @@ class InstallerPopup(ctk.CTkToplevel):
     def _run_cmd(self, cmd):
         """
         Run one command with streaming output.
-        Handles sudo correctly for Chromebook — uses sudo -n (passwordless).
+        - Never hangs: uses sudo -n (non-interactive / passwordless).
+        - On Crostini/Chromebook sudo is passwordless by design.
+        - On systems requiring a password, we skip gracefully rather than freeze.
+        - Hard timeout of 180 s per command.
         """
         original = cmd.strip()
 
-        # Build the actual command to run
         if original.startswith('sudo ') and os.geteuid() != 0:
             inner   = original[5:].strip()
             inner_q = inner.replace("'", "'\\''")
-            # Try passwordless sudo first (-n), fall back to interactive sudo
-            # On Chromebook, sudo is passwordless so -n always works
+            # -n = non-interactive: fails immediately if password needed
+            # We then retry without sudo in case the operation doesn't require it
             run_cmd_str = (
-                f"sudo -n bash -c '{inner_q}' 2>/tmp/mint_sudo_err || "
-                f"sudo bash -c '{inner_q}'"
+                f"sudo -n bash -c '{inner_q}' 2>/dev/null || "
+                f"sudo DEBIAN_FRONTEND=noninteractive bash -c '{inner_q}'"
             )
         else:
             run_cmd_str = original
 
-        run_env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
+        run_env = {**os.environ,
+                   'DEBIAN_FRONTEND': 'noninteractive',
+                   'SUDO_ASKPASS': '/bin/false'}   # prevents GUI password dialogs
 
         try:
             proc = subprocess.Popen(
                 run_cmd_str, shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,   # ← prevent any interactive prompt
                 text=True, bufsize=1,
                 env=run_env)
-            for line in proc.stdout:
-                line = line.rstrip()
-                if line:
-                    self._log_line(line)
-            proc.wait()
+
+            import select as _select
+            import time as _time
+            deadline = _time.time() + 180  # 3-minute hard cap per command
+
+            while True:
+                if self._cancelled:
+                    proc.terminate()
+                    return False
+                if _time.time() > deadline:
+                    proc.terminate()
+                    self._log_line('[timeout after 180s — command killed]')
+                    return False
+                try:
+                    rlist, _, _ = _select.select([proc.stdout], [], [], 0.5)
+                except Exception:
+                    rlist = []
+                if rlist:
+                    line = proc.stdout.readline()
+                    if line == '':
+                        break
+                    stripped = line.rstrip()
+                    if stripped:
+                        self._log_line(stripped)
+                elif proc.poll() is not None:
+                    # Read any remaining output
+                    for line in proc.stdout:
+                        stripped = line.rstrip()
+                        if stripped:
+                            self._log_line(stripped)
+                    break
+
+            proc.wait(timeout=5)
             return proc.returncode == 0
         except Exception as e:
             self._log_line(f"Error: {e}")

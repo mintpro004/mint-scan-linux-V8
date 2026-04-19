@@ -14,12 +14,15 @@ from widgets import C, apply_theme, ScrollableFrame, MONO, MONO_SM, FONT
 from logger import get_logger as _gl
 _log = _gl('app')
 
+VERSION = '8.1.0'
+
 BOOT_LINES = [
-    "INITIALISING MINT SCAN v8...",
+    "INITIALISING MINT SCAN v8.1...",
     "LOADING SECURITY MODULES...",
     "PROBING NETWORK INTERFACES...",
-    "LOADING THREAT ENGINE...",
-    "✓ ALL SYSTEMS READY.",
+    "LOADING THREAT ENGINE + IDS...",
+    "STARTING BACKGROUND SERVICES...",
+    "✓ ALL SYSTEMS READY — v8.1",
 ]
 
 ALL_TABS = [
@@ -129,7 +132,7 @@ class MintScanApp:
         inner.place(relx=0.5, rely=0.5, anchor='center')
         ctk.CTkLabel(inner, text="[ MINT SCAN ]",
                      font=(FONT, 32, 'bold'), text_color=C['ac']).pack(anchor='w')
-        ctk.CTkLabel(inner, text="ADVANCED SECURITY AUDITOR  v8.0  |  MINT PROJECTS",
+        ctk.CTkLabel(inner, text="ADVANCED SECURITY AUDITOR  v8.1  |  MINT PROJECTS",
                      font=(FONT, 9), text_color=C['mu']).pack(anchor='w', pady=(2, 18))
         self.boot_log = ctk.CTkTextbox(inner, width=500, height=180,
                                         font=(FONT, 10), fg_color=C['s2'],
@@ -215,7 +218,7 @@ class MintScanApp:
             try:
                 from plugins import load_all, broadcast_event
                 results = load_all()
-                broadcast_event('app_start', {'version': '8.0'})
+                broadcast_event('app_start', {'version': '8.1'})
                 _log.info(f'Plugins: {len(results)} loaded')
             except Exception as e:
                 _log.debug(f'Plugins: {e}')

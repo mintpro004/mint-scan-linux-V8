@@ -239,19 +239,47 @@ class ApkScreen(ctk.CTkFrame):
         if self.opt_replace.get():   flags.append('-r')
         if self.opt_grant.get():     flags.append('-g')
         if self.opt_downgrade.get(): flags.append('-d')
-        cmd = f"adb -s {self._device} install {' '.join(flags)} '{path}'"
-        self._safe_after(0, lambda: self.prog.set(0.4))
-        self._log(f"Running: adb install {' '.join(flags)} ...")
-        out, err, rc = _r(cmd, timeout=120)
+
+        # Properly shell-quote the path to handle spaces and special chars
+        import shlex
+        quoted_path = shlex.quote(path)
+        flag_str    = ' '.join(flags)
+        cmd = f"adb -s {self._device} install {flag_str} {quoted_path}"
+
+        self._safe_after(0, lambda: self.prog.set(0.3))
+        self._log(f"Running: adb install {flag_str} <apk>")
+        self._log(f"Device: {self._device}")
+
+        out, err, rc = _r(cmd, timeout=180)   # large APKs can take time
+        combined = (out + ' ' + err).strip()
+
         self._safe_after(0, lambda: self.prog.set(1.0))
-        if 'Success' in out or rc == 0:
-            self._log("✓ INSTALLATION SUCCESSFUL")
+
+        if 'Success' in combined or rc == 0:
+            self._log('✓ INSTALLATION SUCCESSFUL')
+            self._log(f'  App installed on device: {self._device}')
         else:
-            self._log(f"✗ FAILED: {out or err}")
-            if 'UNKNOWN_SOURCES' in (out+err):
-                self._log("→ Fix: Settings → Security → Install Unknown Apps → Allow")
-            elif 'VERSION_DOWNGRADE' in (out+err):
-                self._log("→ Fix: Enable 'Allow downgrade' option above")
+            self._log(f'✗ INSTALLATION FAILED')
+            if combined:
+                self._log(f'  Output: {combined[:300]}')
+
+            # Helpful hints for common errors
+            hints = {
+                'UNKNOWN_SOURCES': 'Fix: Settings → Security → Install Unknown Apps → Allow',
+                'VERSION_DOWNGRADE': "Fix: Enable 'Allow downgrade' option above",
+                'ALREADY_EXISTS':    'Fix: Enable Replace existing app (-r) option',
+                'INSTALL_FAILED_INSUFFICIENT_STORAGE': 'Fix: Free storage on the device',
+                'INSTALL_FAILED_OLDER_SDK': 'App requires newer Android version',
+                'INSTALL_FAILED_TEST_ONLY': 'Fix: add -t flag  (test APK)',
+                'no devices': 'Fix: device disconnected — tap ↺ RESCAN',
+                'unauthorized': 'Fix: tap Allow on phone when USB dialog appears',
+                'closed': 'Fix: reconnect USB cable and tap ↺ RESCAN',
+            }
+            for key, hint in hints.items():
+                if key.lower() in combined.lower():
+                    self._log(f'  → {hint}')
+                    break
+
         self._safe_after(0, lambda: self.install_btn.configure(
             state='normal', text='📦 INSTALL APK TO PHONE'))
 
