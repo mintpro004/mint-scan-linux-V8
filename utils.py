@@ -137,68 +137,119 @@ def copy_to_clipboard(text):
 
 def get_wifi_networks():
     """
-    Real Wi-Fi scan using nmcli (NetworkManager).
-    Returns list of dicts with ssid, signal, security, channel, freq, bssid.
+    Robust Wi-Fi scan. Uses nmcli column output (tab/fixed-width) to avoid
+    the colon-collision bug where BSSID aa:bb:cc:dd:ee:ff splits fields wrong.
+    Falls back to iwlist if nmcli unavailable.
     """
     networks = []
 
-    # Rescan first
-    run_cmd("nmcli device wifi rescan 2>/dev/null", timeout=5)
+    # Trigger a rescan — ignore errors (requires admin on some systems)
+    run_cmd("nmcli device wifi rescan 2>/dev/null", timeout=6)
+    time.sleep(1)  # give driver a moment to populate results
 
-    out, err, rc = run_cmd(
-        "nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null")
+    # Use --escape no so BSSIDs (aa:bb:…) are not backslash-escaped,
+    # and separate fields with a unique delimiter that never appears in SSIDs.
+    DELIM = '\x00'
+    cmd = (f"nmcli --escape no -g SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ "
+           f"device wifi list 2>/dev/null")
+    out, _, rc = run_cmd(cmd, timeout=10)
 
-    if (rc != 0 or not out) and os.geteuid() != 0:
-        out, err, rc = run_cmd(
-            "sudo nmcli -t -f SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ device wifi list 2>/dev/null")
+    # If failed, retry with explicit device
+    if rc != 0 or not out.strip():
+        iface = get_wifi_interface()
+        if iface:
+            out, _, rc = run_cmd(
+                f"nmcli --escape no -g SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ "
+                f"device wifi list ifname {iface} 2>/dev/null", timeout=10)
 
-    if rc == 0 and out:
+    if rc == 0 and out.strip():
         for line in out.strip().split('\n'):
-            if not line.strip():
+            line = line.strip()
+            if not line:
                 continue
-            parts = line.split(':')
-            if len(parts) >= 5:
-                ssid     = parts[0] if parts[0] else '(hidden)'
-                bssid    = ':'.join(parts[1:7]) if len(parts) >= 7 else parts[1]
-                try:
-                    signal = int(parts[-4]) if len(parts) >= 5 else 0
-                except ValueError:
-                    signal = 0
-                security = parts[-3] if len(parts) >= 4 else 'OPEN'
-                channel  = parts[-2] if len(parts) >= 3 else '—'
-                freq     = parts[-1] if len(parts) >= 2 else '—'
-                networks.append({
-                    'ssid':     ssid,
-                    'bssid':    bssid,
-                    'signal':   signal,
-                    'security': 'OPEN' if not security or security == '--' else security,
-                    'channel':  channel,
-                    'freq':     freq,
-                })
-        if networks:
-            return sorted(networks, key=lambda x: -x['signal'])
+            # nmcli -g separates fields with ':' but BSSIDs also contain ':'
+            # The BSSID is always exactly 17 chars (xx:xx:xx:xx:xx:xx).
+            # Safe parse: find BSSID pattern, then split around it.
+            bssid_m = re.search(r'([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})', line)
+            if not bssid_m:
+                continue
+            bssid = bssid_m.group(1)
+            before = line[:bssid_m.start()].rstrip(':')
+            after  = line[bssid_m.end():].lstrip(':')
+            ssid   = before if before else '(hidden)'
 
-    # Fallback: iwlist scan
+            tail = after.split(':')
+            # tail is [signal, security, channel, freq_with_unit]
+            try:    signal = int(tail[0]) if tail else 0
+            except: signal = 0
+            security = tail[1].strip() if len(tail) > 1 else ''
+            channel  = tail[2].strip() if len(tail) > 2 else '—'
+            freq     = ':'.join(tail[3:]).strip() if len(tail) > 3 else '—'
+
+            networks.append({
+                'ssid':     ssid.strip(),
+                'bssid':    bssid.upper(),
+                'signal':   signal,
+                'security': 'OPEN' if not security or security in ('--','') else security,
+                'channel':  channel or '—',
+                'freq':     freq or '—',
+            })
+
+        if networks:
+            # De-duplicate by BSSID, keep highest signal
+            seen = {}
+            for n in networks:
+                k = n['bssid']
+                if k not in seen or n['signal'] > seen[k]['signal']:
+                    seen[k] = n
+            return sorted(seen.values(), key=lambda x: -x['signal'])
+
+    # ── Fallback: iwlist scan ─────────────────────────────────────
     iface = get_wifi_interface()
     if iface:
-        out, _, rc = run_cmd(f'sudo iwlist {iface} scan 2>/dev/null')
+        out, _, rc = run_cmd(f'iwlist {iface} scan 2>/dev/null', timeout=10)
+        if rc != 0:
+            out, _, rc = run_cmd(f'sudo iwlist {iface} scan 2>/dev/null', timeout=10)
         if rc == 0 and 'ESSID' in out:
-            cells = out.split('Cell ')
-            for cell in cells[1:]:
+            for cell in out.split('Cell ')[1:]:
                 ssid_m   = re.search(r'ESSID:"([^"]*)"', cell)
                 signal_m = re.search(r'Signal level=(-?\d+)', cell)
                 enc_m    = re.search(r'Encryption key:(on|off)', cell)
                 freq_m   = re.search(r'Frequency:([\d.]+)', cell)
-                bssid_m  = re.search(r'Address: ([0-9A-F:]+)', cell)
+                bssid_m  = re.search(r'Address: ([0-9A-Fa-f:]{17})', cell)
                 chan_m   = re.search(r'Channel:(\d+)', cell)
                 networks.append({
-                    'ssid':     ssid_m.group(1)   if ssid_m   else '(hidden)',
-                    'bssid':    bssid_m.group(1)  if bssid_m  else '—',
-                    'signal':   int(signal_m.group(1)) if signal_m else -100,
+                    'ssid':     (ssid_m.group(1) if ssid_m else '(hidden)').strip(),
+                    'bssid':    bssid_m.group(1).upper() if bssid_m else '—',
+                    'signal':   int(signal_m.group(1)) + 100 if signal_m else 0,
                     'security': 'WPA/WPA2' if enc_m and enc_m.group(1) == 'on' else 'OPEN',
-                    'channel':  chan_m.group(1)   if chan_m   else '—',
-                    'freq':     freq_m.group(1)+'GHz' if freq_m else '—',
+                    'channel':  chan_m.group(1) if chan_m else '—',
+                    'freq':     freq_m.group(1) + ' GHz' if freq_m else '—',
                 })
+
+    # ── Last resort: iw scan ──────────────────────────────────────
+    if not networks and iface:
+        out, _, rc = run_cmd(f'sudo iw {iface} scan 2>/dev/null', timeout=12)
+        if rc == 0 and out:
+            cur: dict = {}
+            for line in out.split('\n'):
+                line = line.strip()
+                bss = re.match(r'BSS ([0-9a-f:]{17})', line)
+                if bss:
+                    if cur: networks.append(cur)
+                    cur = {'ssid':'(hidden)','bssid':bss.group(1).upper(),
+                           'signal':0,'security':'OPEN','channel':'—','freq':'—'}
+                elif 'SSID:' in line and cur:
+                    cur['ssid'] = line.split('SSID:',1)[1].strip() or '(hidden)'
+                elif 'signal:' in line and cur:
+                    try: cur['signal'] = int(float(line.split(':',1)[1].split()[0]) + 100)
+                    except: pass
+                elif 'RSN' in line or 'WPA' in line:
+                    if cur: cur['security'] = 'WPA2'
+                elif '* primary channel:' in line and cur:
+                    try: cur['channel'] = line.split(':',1)[1].strip()
+                    except: pass
+            if cur: networks.append(cur)
 
     return sorted(networks, key=lambda x: -x['signal'])
 
@@ -220,17 +271,101 @@ def get_wifi_interface():
 
 
 def get_current_wifi():
-    """Get currently connected SSID."""
-    out, _, rc = run_cmd('nmcli -t -f NAME,TYPE,DEVICE,STATE connection show --active 2>/dev/null')
+    """Get currently connected SSID and details robustly."""
+    # Method 1: nmcli active connection
+    out, _, rc = run_cmd(
+        "nmcli -t -f NAME,TYPE,DEVICE,STATE connection show --active 2>/dev/null")
     for line in out.split('\n'):
-        if 'wifi' in line.lower() or '802-11' in line.lower():
-            parts = line.split(':')
-            if parts:
-                return parts[0]
+        lo = line.lower()
+        if 'wifi' in lo or '802-11' in lo or 'wireless' in lo:
+            name = line.split(':')[0].strip()
+            if name:
+                return name
+    # Method 2: nmcli device active SSID
+    out, _, rc = run_cmd(
+        "nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null")
+    for line in out.split('\n'):
+        if line.startswith('yes:') or line.startswith('*:'):
+            ssid = line.split(':', 1)[1].strip()
+            if ssid:
+                return ssid
+    # Method 3: iwgetid
     out, _, rc = run_cmd('iwgetid -r 2>/dev/null')
-    if rc == 0 and out:
+    if rc == 0 and out.strip():
         return out.strip()
+    # Method 4: iw dev
+    iface = get_wifi_interface()
+    if iface:
+        out, _, _ = run_cmd(f'iw {iface} info 2>/dev/null')
+        m = re.search(r'ssid (.+)', out)
+        if m:
+            return m.group(1).strip()
     return None
+
+
+def get_saved_wifi_networks():
+    """
+    Return list of previously connected Wi-Fi networks with last-used time.
+    Reads from NetworkManager connection profiles.
+    """
+    saved = []
+
+    # Method 1: nmcli connection show (lists all profiles)
+    out, _, rc = run_cmd(
+        "nmcli -t -f NAME,TYPE,TIMESTAMP-REAL connection show 2>/dev/null",
+        timeout=8)
+    if rc == 0 and out:
+        for line in out.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            # Format: NAME:TYPE:TIMESTAMP
+            # NAME may contain colons — split from right
+            parts = line.rsplit(':', 2)
+            if len(parts) < 2:
+                continue
+            if len(parts) == 3:
+                name, ctype, ts = parts
+            elif len(parts) == 2:
+                name, ctype = parts
+                ts = ''
+            else:
+                continue
+            if '802-11-wireless' in ctype or 'wifi' in ctype.lower():
+                saved.append({
+                    'name': name.strip(),
+                    'type': 'Wi-Fi',
+                    'last': ts.strip() or 'Unknown',
+                })
+        if saved:
+            return saved
+
+    # Method 2: scan /etc/NetworkManager/system-connections/
+    nm_dir = '/etc/NetworkManager/system-connections'
+    if os.path.exists(nm_dir):
+        try:
+            for fname in sorted(os.listdir(nm_dir)):
+                fpath = os.path.join(nm_dir, fname)
+                try:
+                    content = open(fpath).read()
+                    if '802-11-wireless' in content or 'wifi' in content.lower():
+                        # Extract SSID
+                        ssid_m = re.search(r'ssid=(.+)', content)
+                        ssid = ssid_m.group(1).strip() if ssid_m else fname
+                        ts_m = re.search(r'timestamp=(\d+)', content)
+                        if ts_m:
+                            import datetime
+                            ts = datetime.datetime.fromtimestamp(
+                                int(ts_m.group(1))).strftime('%Y-%m-%d %H:%M')
+                        else:
+                            ts = 'Unknown'
+                        saved.append({'name': ssid, 'type': 'Wi-Fi', 'last': ts})
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    return saved
 
 
 def get_network_interfaces():

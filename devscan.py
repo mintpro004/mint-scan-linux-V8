@@ -277,44 +277,105 @@ class DevScanScreen(ctk.CTkFrame):
 
     def _discover_hosts(self, subnet):
         devices = []
-        # Try nmap -sn (ping scan)
-        out, _, rc = _run(f"nmap -sn --host-timeout 3s {subnet} 2>/dev/null", timeout=60)
+        self._log('Method 1: nmap ping scan...')
+
+        # ── Method 1: nmap (best — gives MACs too) ───────────────
+        out, _, rc = _run(f'nmap -sn --host-timeout 3s {subnet} 2>/dev/null', timeout=90)
         if rc == 0 and 'Nmap scan report' in out:
             cur = {}
             for line in out.split('\n'):
                 if 'Nmap scan report' in line:
-                    if cur:
+                    if cur.get('ip'):
                         devices.append(cur)
-                    ip_m    = re.search(r'(\d+\.\d+\.\d+\.\d+)', line)
-                    host_m  = re.search(r'for (.+?) \(', line)
-                    cur = {
-                        'ip':     ip_m.group(1) if ip_m else '',
-                        'host':   host_m.group(1) if host_m else '',
-                        'mac':    '', 'vendor': '', 'type': 'Unknown',
-                        'icon':   '❓', 'ports': [], 'risks': [],
-                        'infected': False, 'infect_reasons': [],
-                    }
+                    ip_m   = re.search(r'(\d+\.\d+\.\d+\.\d+)', line)
+                    host_m = re.search(r'for (.+?) \(', line)
+                    cur = self._blank_dev(
+                        ip=ip_m.group(1) if ip_m else '',
+                        host=host_m.group(1) if host_m else '')
                 elif 'MAC Address' in line and cur:
-                    mac_m    = re.search(r'([0-9A-F:]{17})', line)
+                    mac_m    = re.search(r'([0-9A-Fa-f:]{17})', line, re.I)
                     vendor_m = re.search(r'\((.+)\)', line)
-                    cur['mac']    = mac_m.group(1) if mac_m else ''
-                    cur['vendor'] = vendor_m.group(1) if vendor_m else ''
-            if cur:
+                    cur['mac']    = mac_m.group(1).upper()    if mac_m    else ''
+                    cur['vendor'] = vendor_m.group(1)         if vendor_m else ''
+            if cur.get('ip'):
                 devices.append(cur)
-        else:
-            # Fallback: arp table
-            out, _, _ = _run("arp -n 2>/dev/null | grep -v incomplete | tail -n +2")
-            for line in out.split('\n'):
-                parts = line.split()
-                if len(parts) >= 3 and re.match(r'\d+\.\d+\.\d+\.\d+', parts[0]):
-                    devices.append({
-                        'ip': parts[0], 'mac': parts[2],
-                        'vendor': '', 'host': '',
-                        'type': 'Unknown', 'icon': '❓',
-                        'ports': [], 'risks': [],
-                        'infected': False, 'infect_reasons': [],
-                    })
+            if devices:
+                self._log(f'nmap found {len(devices)} hosts')
+                return devices
+
+        # ── Method 2: ping sweep (parallel) ──────────────────────
+        self._log('nmap unavailable — ping sweep fallback...')
+        prefix = '.'.join(subnet.split('.')[:3])
+        alive  = []
+        lock   = threading.Lock()
+
+        def _ping(ip):
+            r, _, rc = _run(f'ping -c 1 -W 1 {ip} 2>/dev/null', timeout=3)
+            if rc == 0:
+                with lock:
+                    alive.append(ip)
+
+        threads = []
+        for i in range(1, 255):
+            ip = f'{prefix}.{i}'
+            t  = threading.Thread(target=_ping, args=(ip,), daemon=True)
+            threads.append(t)
+            t.start()
+            if len(threads) % 50 == 0:
+                for t2 in threads[-50:]: t2.join(timeout=4)
+
+        for t in threads: t.join(timeout=4)
+        self._log(f'Ping sweep: {len(alive)} hosts responded')
+
+        # Enrich alive hosts with ARP table
+        arp_out, _, _ = _run('arp -n 2>/dev/null')
+        arp_map = {}
+        for line in arp_out.split('\n'):
+            parts = line.split()
+            if len(parts) >= 3 and re.match(r'\d+\.\d+\.\d+\.\d+', parts[0]):
+                arp_map[parts[0]] = parts[2] if parts[2] != '(incomplete)' else ''
+
+        # Also check ip neigh for better MAC coverage
+        neigh_out, _, _ = _run('ip neigh show 2>/dev/null')
+        for line in neigh_out.split('\n'):
+            parts = line.split()
+            if len(parts) >= 5 and re.match(r'\d+\.\d+\.\d+\.\d+', parts[0]):
+                ip = parts[0]
+                mac_m = re.search(r'([0-9a-f:]{17})', line, re.I)
+                if mac_m and ip not in arp_map:
+                    arp_map[ip] = mac_m.group(1).upper()
+                if 'REACHABLE' in line or 'STALE' in line:
+                    if ip not in alive:
+                        alive.append(ip)
+
+        # Also include our own router/gateway
+        gw_out, _, _ = _run("ip route | grep default | awk '{print $3}' | head -1")
+        if gw_out.strip() and gw_out.strip() not in alive:
+            alive.insert(0, gw_out.strip())
+
+        for ip in sorted(set(alive)):
+            dev = self._blank_dev(ip=ip)
+            dev['mac'] = arp_map.get(ip, '')
+            devices.append(dev)
+
+        # ── Method 3: arp table alone if nothing responded ────────
+        if not devices:
+            self._log('Ping failed — using arp-cache only...')
+            for ip, mac in arp_map.items():
+                dev = self._blank_dev(ip=ip)
+                dev['mac'] = mac
+                devices.append(dev)
+
         return devices
+
+    @staticmethod
+    def _blank_dev(ip='', host=''):
+        return {
+            'ip': ip, 'host': host, 'mac': '', 'vendor': '',
+            'type': 'Unknown', 'icon': '❓',
+            'ports': [], 'risks': [],
+            'infected': False, 'infect_reasons': [],
+        }
 
     def _fingerprint(self, dev):
         ip     = dev['ip']

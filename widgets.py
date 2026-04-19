@@ -587,3 +587,313 @@ class PortBar(ctk.CTkFrame):
             text=f'Process: {process}  State: {state}',
             font=(FONT, 9), text_color=C['mu']
         ).pack(anchor='w', padx=10, pady=(0, 7))
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  ENHANCED UI COMPONENTS  — animations, glows, sparklines
+# ═══════════════════════════════════════════════════════════════════
+
+import math as _math
+
+
+class PulseIndicator(ctk.CTkFrame):
+    """
+    Animated pulsing status dot.
+    Colors: use C['ok'], C['wn'], C['am'], C['ac'], C['mu'].
+    """
+    def __init__(self, parent, color=None, size=10, **kw):
+        super().__init__(parent, fg_color='transparent',
+                         width=size+6, height=size+6, **kw)
+        self._color  = color or C['ok']
+        self._size   = size
+        self._on     = True
+        self._dot    = ctk.CTkFrame(self, width=size, height=size,
+                                    fg_color=self._color, corner_radius=size)
+        self._dot.place(relx=0.5, rely=0.5, anchor='center')
+        self._tick()
+
+    def set_color(self, color):
+        self._color = color
+        self._dot.configure(fg_color=color)
+
+    def _tick(self):
+        try:
+            if not self.winfo_exists(): return
+            self._on = not self._on
+            self._dot.configure(fg_color=self._color if self._on else C['br'])
+            self.after(600, self._tick)
+        except Exception: pass
+
+
+class SparkLine(tk.Canvas):
+    """
+    Tiny rolling line chart for CPU/memory history.
+    """
+    def __init__(self, parent, width=80, height=28, color=None, **kw):
+        bg = C['bg']
+        super().__init__(parent, width=width, height=height,
+                         bg=bg, highlightthickness=0, **kw)
+        self._w      = width
+        self._h      = height
+        self._color  = color or C['ac']
+        self._data   = []
+        self._max    = 100
+
+    def push(self, value):
+        self._data.append(float(value))
+        if len(self._data) > self._w // 3:
+            self._data.pop(0)
+        self._draw()
+
+    def _draw(self):
+        self.delete('all')
+        if len(self._data) < 2:
+            return
+        mx  = max(self._data) or 1
+        pts = []
+        n   = len(self._data)
+        for i, v in enumerate(self._data):
+            x = int(i * (self._w / (n - 1)))
+            y = int(self._h - (v / mx) * (self._h - 4) - 2)
+            pts.append((x, y))
+        # Fill area under line
+        fill_pts = [(0, self._h)] + pts + [(self._w, self._h)]
+        flat = [c for xy in fill_pts for c in xy]
+        try:
+            # Dim fill color
+            r, g, b = int(self._color[1:3],16), int(self._color[3:5],16), int(self._color[5:7],16)
+            fill_col = f'#{r//5:02x}{g//5:02x}{b//5:02x}'
+            self.create_polygon(flat, fill=fill_col, outline='')
+        except Exception:
+            pass
+        # Line
+        flat_line = [c for xy in pts for c in xy]
+        if len(flat_line) >= 4:
+            self.create_line(flat_line, fill=self._color, width=1, smooth=True)
+
+
+class AnimatedProgressBar(ctk.CTkFrame):
+    """
+    Progress bar that animates smoothly to target value.
+    """
+    def __init__(self, parent, color=None, height=6, **kw):
+        super().__init__(parent, fg_color='transparent', **kw)
+        self._target = 0.0
+        self._current = 0.0
+        self._bar = ctk.CTkProgressBar(self, height=height,
+                                        progress_color=color or C['ac'],
+                                        fg_color=C['br'])
+        self._bar.pack(fill='x')
+        self._bar.set(0)
+
+    def set_value(self, v):
+        self._target = max(0.0, min(1.0, float(v)))
+        self._animate()
+
+    def _animate(self):
+        diff = self._target - self._current
+        if abs(diff) > 0.005:
+            self._current += diff * 0.18
+            try:
+                self._bar.set(self._current)
+                self.after(16, self._animate)
+            except Exception:
+                pass
+        else:
+            self._current = self._target
+            try:
+                self._bar.set(self._current)
+            except Exception:
+                pass
+
+
+class GlowLabel(ctk.CTkLabel):
+    """
+    Label that fades in from transparent to full color.
+    Call .fade_in() to trigger animation.
+    """
+    def __init__(self, parent, text, color=None, fade=True, **kw):
+        self._target_color = color or C['tx']
+        kw.setdefault('text_color', C['bg'])   # start invisible
+        super().__init__(parent, text=text, **kw)
+        if fade:
+            self._step = 0
+            self.after(30, self._do_fade)
+
+    def fade_in(self):
+        self._step = 0
+        self.after(30, self._do_fade)
+
+    def _do_fade(self):
+        try:
+            if not self.winfo_exists(): return
+            self._step = min(self._step + 0.08, 1.0)
+            col  = self._target_color
+            bg   = C['bg']
+            # Lerp bg→col
+            def _lerp(a, b, t):
+                return int(int(a,16) + (int(b,16)-int(a,16))*t)
+            r = _lerp(bg[1:3], col[1:3], self._step)
+            g = _lerp(bg[3:5], col[3:5], self._step)
+            b_ = _lerp(bg[5:7], col[5:7], self._step)
+            self.configure(text_color=f'#{r:02x}{g:02x}{b_:02x}')
+            if self._step < 1.0:
+                self.after(16, self._do_fade)
+        except Exception:
+            pass
+
+
+class StatusChip(ctk.CTkFrame):
+    """
+    Compact status chip: colored border + icon + text.
+    status: 'ok' | 'warn' | 'error' | 'info' | 'active'
+    """
+    _STATUS = {
+        'ok':     (C['ok'],  C['okg'],  '✓'),
+        'warn':   (C['am'],  C['amg'],  '⚠'),
+        'error':  (C['wn'],  C['wng'],  '✗'),
+        'info':   (C['bl'],  C['acg'],  'ℹ'),
+        'active': (C['ac'],  C['acg'],  '●'),
+    }
+
+    def __init__(self, parent, status='ok', text='', **kw):
+        col, bg, icon = self._STATUS.get(status, self._STATUS['info'])
+        kw.pop('fg_color', None)
+        super().__init__(parent, fg_color=bg,
+                         border_color=col, border_width=1,
+                         corner_radius=5, **kw)
+        row = ctk.CTkFrame(self, fg_color='transparent')
+        row.pack(padx=8, pady=3)
+        ctk.CTkLabel(row, text=icon, font=(FONT, 9, 'bold'),
+                     text_color=col).pack(side='left', padx=(0,4))
+        ctk.CTkLabel(row, text=text, font=(FONT, 9, 'bold'),
+                     text_color=col).pack(side='left')
+
+
+class ScannerRow(ctk.CTkFrame):
+    """
+    Animated scan-progress row for device/network scanners.
+    Shows IP + a moving progress line while scanning.
+    """
+    def __init__(self, parent, ip, **kw):
+        super().__init__(parent, fg_color=C['sf'],
+                         border_color=C['br'], border_width=1,
+                         corner_radius=6, **kw)
+        self._scanning = True
+        self._pos      = 0
+
+        row = ctk.CTkFrame(self, fg_color='transparent')
+        row.pack(fill='x', padx=10, pady=4)
+
+        ctk.CTkLabel(row, text='⟳', font=(FONT, 11),
+                     text_color=C['ac']).pack(side='left', padx=(0,6))
+        ctk.CTkLabel(row, text=ip, font=(FONT, 10, 'bold'),
+                     text_color=C['tx']).pack(side='left')
+        self._status = ctk.CTkLabel(row, text='scanning…',
+                                     font=(FONT, 9), text_color=C['mu'])
+        self._status.pack(side='right')
+
+        self._prog = ctk.CTkProgressBar(self, height=2,
+                                         progress_color=C['ac'],
+                                         fg_color=C['br'])
+        self._prog.pack(fill='x', padx=0, pady=0)
+        self._prog.set(0)
+        self._tick()
+
+    def done(self, text='done', color=None):
+        self._scanning = False
+        try:
+            self._status.configure(text=text, text_color=color or C['ok'])
+            self._prog.set(1.0)
+        except Exception: pass
+
+    def _tick(self):
+        if not self._scanning: return
+        try:
+            if not self.winfo_exists(): return
+            self._pos = (self._pos + 0.03) % 1.0
+            # ping-pong
+            v = abs(_math.sin(self._pos * _math.pi))
+            self._prog.set(v)
+            self.after(40, self._tick)
+        except Exception: pass
+
+
+class ToastNotification(ctk.CTkFrame):
+    """
+    Slide-in toast notification that auto-dismisses.
+    """
+    def __init__(self, parent, message, status='info', duration=4000):
+        col = {'ok': C['ok'], 'warn': C['am'], 'error': C['wn'],
+               'info': C['ac']}.get(status, C['ac'])
+        super().__init__(parent, fg_color=C['sf'],
+                         border_color=col, border_width=1,
+                         corner_radius=8)
+        ctk.CTkLabel(self, text=message, font=(FONT, 10),
+                     text_color=col, wraplength=300).pack(padx=16, pady=10)
+        # Auto-destroy
+        self.after(duration, self._dismiss)
+
+    def _dismiss(self):
+        try:
+            self.destroy()
+        except Exception:
+            pass
+
+
+class DeviceCard(ctk.CTkFrame):
+    """
+    Rich device card for the device scanner with icon, IP, vendor, risk badge.
+    """
+    def __init__(self, parent, device: dict, **kw):
+        risk_col = C['wn'] if device.get('infected') else C['ok']
+        kw.pop('fg_color', None)
+        super().__init__(parent, fg_color=C['sf'],
+                         border_color=risk_col, border_width=1,
+                         corner_radius=8, **kw)
+        # Top row: icon + IP + hostname
+        top = ctk.CTkFrame(self, fg_color='transparent')
+        top.pack(fill='x', padx=10, pady=(8,4))
+
+        icon = device.get('icon', '❓')
+        ctk.CTkLabel(top, text=icon,
+                     font=(FONT, 22)).pack(side='left', padx=(0,10))
+
+        info = ctk.CTkFrame(top, fg_color='transparent')
+        info.pack(side='left', fill='x', expand=True)
+        ctk.CTkLabel(info, text=device.get('ip','—'),
+                     font=(FONT, 13, 'bold'),
+                     text_color=C['ac']).pack(anchor='w')
+        host = device.get('host') or device.get('vendor') or device.get('type','Unknown')
+        ctk.CTkLabel(info, text=host,
+                     font=(FONT, 9), text_color=C['mu']).pack(anchor='w')
+
+        # Risk badge
+        if device.get('infected'):
+            StatusChip(top, status='error', text='RISK').pack(side='right')
+        else:
+            StatusChip(top, status='ok', text='CLEAN').pack(side='right')
+
+        # Details row
+        det = ctk.CTkFrame(self, fg_color='transparent')
+        det.pack(fill='x', padx=10, pady=(0,6))
+
+        for label, val in [
+            ('TYPE',   device.get('type','Unknown')),
+            ('MAC',    device.get('mac','—')    or '—'),
+            ('VENDOR', device.get('vendor','—') or '—'),
+            ('PORTS',  str(len(device.get('ports',[]))) + ' open'),
+        ]:
+            c2 = ctk.CTkFrame(det, fg_color='transparent')
+            c2.pack(side='left', padx=10)
+            ctk.CTkLabel(c2, text=label,
+                         font=(FONT, 7, 'bold'), text_color=C['mu']).pack(anchor='w')
+            ctk.CTkLabel(c2, text=val,
+                         font=(FONT, 9, 'bold'), text_color=C['tx']).pack(anchor='w')
+
+        # Infection warnings
+        for reason in device.get('infect_reasons', [])[:3]:
+            ctk.CTkFrame(self, height=1, fg_color=C['br']).pack(fill='x', padx=10)
+            ctk.CTkLabel(self, text=f'⚠  {reason}',
+                         font=(FONT, 8), text_color=C['wn']
+                         ).pack(anchor='w', padx=12, pady=2)
