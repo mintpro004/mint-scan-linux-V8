@@ -160,20 +160,12 @@ class PortsScreen(ctk.CTkFrame):
             target=self._do_remote_scan, args=(host, start, end), daemon=True).start()
 
     def _do_remote_scan(self, host, start, end):
-        # Validation: Allow IPs and hostnames, reject shell metachars
-        if not re.match(r'^[a-zA-Z0-9.\-_]+$', host):
-            self._safe_after(0, self.scan_prog_lbl.configure, 
-                             {'text': f"✗ Invalid host: {host}", 'text_color': C['wn']})
-            self._cleanup_scan()
-            return
-
         open_ports = []
         total = end - start + 1
 
         # Try nmap first (much faster)
-        cmd = ["nmap", "-T4", "--open", "-p", f"{start}-{end}", host]
-        nmap_out, _, nmap_rc = run_cmd(cmd, timeout=30)
-        
+        nmap_out, _, nmap_rc = run_cmd(
+            f"nmap -T4 --open -p {start}-{end} {host} 2>/dev/null", timeout=30)
         if nmap_rc == 0 and 'open' in nmap_out:
             for line in nmap_out.split('\n'):
                 m = re.match(r'(\d+)/tcp\s+open\s+(\S+)', line)

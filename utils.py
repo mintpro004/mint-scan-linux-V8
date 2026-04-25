@@ -16,41 +16,30 @@ from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 
 def run_cmd(cmd, timeout=8):
     """
-    Run a command safely.
-    - If 'cmd' is a list: runs with shell=False (SECURE).
-    - If 'cmd' is a string: runs with shell=True (LEGACY/INSECURE).
-    Uses sudo -n (non-interactive) to prevent hanging on password prompts.
+    Run a shell command safely.
+    Uses sudo -n (passwordless) so commands work on Chromebook/Crostini.
+    Sets DEBIAN_FRONTEND=noninteractive for apt commands.
     """
-    original_cmd = cmd if isinstance(cmd, str) else " ".join(cmd)
-    is_shell = isinstance(cmd, str)
+    original_cmd = cmd
 
-    # Elevation handling
-    if os.getuid() != 0:
-        if is_shell and cmd.strip().startswith('sudo '):
-            inner = cmd.strip()[5:].strip()
-            inner_q = inner.replace("'", "'\\''")
-            # Try non-interactive sudo first, then fall back
-            cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
-        elif not is_shell and cmd[0] == 'sudo':
-            # For lists, we ensure -n is present if not already
-            if '-n' not in cmd:
-                cmd.insert(1, '-n')
+    # For sudo commands: use sudo -n (non-interactive) first,
+    # fall back to plain sudo (user may have passwordless sudo configured)
+    # sudo -n = non-interactive; works with Chromebook passwordless sudo
+    if cmd.strip().startswith('sudo ') and os.geteuid() != 0:
+        inner = cmd.strip()[5:].strip()
+        inner_q = inner.replace("'", "'\\''")
+        # sudo -n tries without password; if that fails, try plain sudo
+        cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
 
-    run_env = {**os.environ,
-               'DEBIAN_FRONTEND': 'noninteractive',
-               'SUDO_ASKPASS': '/bin/false'}
+    run_env = {**os.environ, 'DEBIAN_FRONTEND': 'noninteractive'}
 
     try:
         r = subprocess.run(
-            cmd, shell=is_shell, capture_output=True,
+            cmd, shell=True, capture_output=True,
             text=True, timeout=timeout, env=run_env)
-        
-        stdout = r.stdout.strip() if r.stdout else ""
-        stderr = r.stderr.strip() if r.stderr else ""
-        
-        if r.returncode != 0 and stderr:
-            _log.debug(f'cmd [{r.returncode}]: {stderr[:120]}')
-        return stdout, stderr, r.returncode
+        if r.returncode != 0 and r.stderr.strip():
+            _log.debug(f'cmd [{r.returncode}]: {r.stderr.strip()[:120]}')
+        return r.stdout.strip(), r.stderr.strip(), r.returncode
 
     except subprocess.TimeoutExpired:
         _log.warning(f'Timeout ({timeout}s): {original_cmd[:80]}')
@@ -80,7 +69,7 @@ def get_public_ip_info():
         import urllib.request
         req = urllib.request.Request(
             'https://ipapi.co/json/',
-            headers={'User-Agent': 'MintScan/8.2'})
+            headers={'User-Agent': 'MintScan/8.1'})
         with urllib.request.urlopen(req, timeout=6) as r:
             data = json.loads(r.read().decode())
         _ip_cache['data'] = data
@@ -275,13 +264,11 @@ def get_wifi_networks():
 
 def get_wifi_interface():
     """Detect the wireless interface name."""
-    out, _, _ = run_cmd(['iw', 'dev'])
+    out, _, _ = run_cmd('iw dev 2>/dev/null | grep Interface')
     if out:
-        for line in out.splitlines():
-            if 'Interface' in line:
-                parts = line.strip().split()
-                if len(parts) >= 2:
-                    return parts[-1]
+        parts = out.strip().split()
+        if len(parts) >= 2:
+            return parts[-1]
     try:
         for iface in os.listdir('/sys/class/net'):
             if os.path.exists(f'/sys/class/net/{iface}/wireless'):
@@ -574,4 +561,3 @@ def analyse_phone_number(num):
     sa_clean = re.sub(r'^\+27|^0027|^0', '', clean)
     op = SA_OPERATORS.get(sa_clean[:2])
     return {'risk': level, 'reasons': risks, 'operator': op, 'clean': clean}
-, 'reasons': risks, 'operator': op, 'clean': clean}

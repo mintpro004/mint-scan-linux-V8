@@ -1,5 +1,5 @@
 """
-Mint Scan v8.2 — Software Updater
+Mint Scan v8.1 — Software Updater
 Checks GitHub for updates via Releases API → Tags API → git log.
 Update delivery: git pull (auto-detects branch) OR zip download fallback.
 """
@@ -16,7 +16,7 @@ log = get_logger('updater')
 REPO_OWNER  = 'mintpro004'
 REPO_NAME   = 'mint-scan-linux-V8'
 REPO_API    = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}'
-CURRENT_VER = '8.2.0'
+CURRENT_VER = '8.1.0'
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 
 

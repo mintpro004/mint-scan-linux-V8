@@ -9,7 +9,7 @@ echo -e "\033[0;36m[ MINT SCAN ]\033[0m Preparing update for GitHub..."
 git add .
 
 # Prompt for commit message or use default
-MSG="v8.2: World-Standard Security Hardening, Shell Injection Protection, and UI Reorganization"
+MSG="Fixes: UI dynamic theme, UFW non-interactive install, Wi-Fi passwords, Speed Test, and Report Generation"
 if [ -n "$1" ]; then
     MSG="$1"
 fi
