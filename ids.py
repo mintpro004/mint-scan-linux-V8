@@ -425,16 +425,22 @@ class IDSScreen(ctk.CTkFrame):
 
     def _start_suricata(self):
         iface = self._get_iface()
+        # Basic validation: only alphanumeric + some chars, no shell metachars
+        if not re.match(r'^[a-z0-9.\-_]+$', iface):
+            self._rule_status.configure(text=f"✗ Invalid interface: {iface}", text_color=C['wn'])
+            return
+
         log.info(f'Starting Suricata on {iface}')
         self._rule_status.configure(text=f'Starting Suricata on {iface}...', text_color=C['ac'])
         def _bg():
-            run_cmd('sudo mkdir -p /var/log/suricata', timeout=5)
+            run_cmd(['sudo', 'mkdir', '-p', '/var/log/suricata'], timeout=5)
             # Use --af-packet for best performance on Linux
-            out, err, rc = run_cmd(
-                f'sudo suricata --af-packet={iface} -D '
-                f'--pidfile /var/run/suricata.pid '
-                f'-l /var/log/suricata/ 2>&1',
-                timeout=30)
+            cmd = [
+                'sudo', 'suricata', f'--af-packet={iface}', '-D',
+                '--pidfile', '/var/run/suricata.pid',
+                '-l', '/var/log/suricata/'
+            ]
+            out, err, rc = run_cmd(cmd, timeout=30)
             result = (out or err or f'exit={rc}')[:100]
             ok = rc == 0 or 'daemon' in result.lower() or 'pid' in result.lower()
             self._safe_after(0, self._rule_status.configure, {
@@ -447,8 +453,8 @@ class IDSScreen(ctk.CTkFrame):
 
     def _stop_suricata(self):
         def _bg():
-            run_cmd('sudo killall suricata 2>/dev/null', timeout=8)
-            run_cmd('sudo rm -f /var/run/suricata.pid', timeout=5)
+            run_cmd(['sudo', 'killall', 'suricata'], timeout=8)
+            run_cmd(['sudo', 'rm', '-f', '/var/run/suricata.pid'], timeout=5)
             log.info('Suricata stopped')
             self._safe_after(500, lambda: threading.Thread(
                 target=self._bg_refresh, daemon=True).start())
@@ -456,8 +462,8 @@ class IDSScreen(ctk.CTkFrame):
 
     def _sur_status(self):
         def _bg():
-            out, _, _ = run_cmd('sudo suricata --list-runmodes 2>/dev/null | head -5', timeout=5)
-            svc, _, _ = run_cmd('systemctl status suricata 2>/dev/null | head -8', timeout=5)
+            out, _, _ = run_cmd(['sudo', 'suricata', '--list-runmodes'], timeout=5)
+            svc, _, _ = run_cmd(['systemctl', 'status', 'suricata'], timeout=5)
             text = (out or svc or 'Suricata status unavailable')[:200]
             self._safe_after(0, self._rule_status.configure,
                              {'text': text, 'text_color': C['ac']})
@@ -466,7 +472,7 @@ class IDSScreen(ctk.CTkFrame):
     def _update_rules(self):
         self._rule_status.configure(text='Updating Suricata rules...', text_color=C['ac'])
         def _bg():
-            out, err, rc = run_cmd('sudo suricata-update 2>&1', timeout=180)
+            out, err, rc = run_cmd(['sudo', 'suricata-update'], timeout=180)
             result = (out or err or f'exit={rc}')[-200:]
             self._safe_after(0, self._rule_status.configure, {
                 'text': ('✓ Rules updated' if rc == 0 else f'✗ {result[:80]}'),
@@ -475,15 +481,18 @@ class IDSScreen(ctk.CTkFrame):
 
     def _start_snort(self):
         iface = self._get_iface()
+        if not re.match(r'^[a-z0-9.\-_]+$', iface):
+            self._rule_status.configure(text=f"✗ Invalid interface: {iface}", text_color=C['wn'])
+            return
+
         log.info(f'Starting Snort on {iface}')
         def _bg():
-            run_cmd('sudo mkdir -p /var/log/snort', timeout=5)
+            run_cmd(['sudo', 'mkdir', '-p', '/var/log/snort'], timeout=5)
             conf = '/etc/snort/snort.conf'
+            cmd = ['sudo', 'snort', '-D', '-i', iface, '-A', 'fast', '-l', '/var/log/snort/']
             if os.path.exists(conf):
-                cmd = f'sudo snort -D -i {iface} -A fast -l /var/log/snort/ -c {conf} 2>&1'
-            else:
-                # Basic mode without config — still works for detection
-                cmd = f'sudo snort -D -i {iface} -A fast -l /var/log/snort/ 2>&1'
+                cmd.extend(['-c', conf])
+            
             out, err, rc = run_cmd(cmd, timeout=25)
             result = (out or err or f'exit={rc}')[:100]
             ok = rc == 0
@@ -496,7 +505,7 @@ class IDSScreen(ctk.CTkFrame):
         threading.Thread(target=_bg, daemon=True).start()
 
     def _stop_snort(self):
-        run_cmd('sudo killall snort 2>/dev/null', timeout=8)
+        run_cmd(['sudo', 'killall', 'snort'], timeout=8)
         threading.Thread(target=self._bg_refresh, daemon=True).start()
 
     def _test_rule(self):

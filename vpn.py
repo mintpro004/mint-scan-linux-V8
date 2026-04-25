@@ -321,103 +321,82 @@ class VPNScreen(ctk.CTkFrame):
         iface = self._get_wg_iface()
         if not iface:
             self._ulog('No WireGuard config selected.')
-            self._ulog('  → Place a .conf file in /etc/wireguard/ or ~/vpn/')
-            self._ulog('  → Then tap ↺ REFRESH to detect it')
             return
+        
+        # Validation
+        if not re.match(r'^[a-zA-Z0-9.\-_]+$', iface):
+            self._ulog(f'✗ Invalid interface name: {iface}')
+            return
+
         conf = self._wg_var.get()
         self._ulog(f'Starting WireGuard: {iface}')
-        self._ulog(f'Config: {conf}')
         def _bg():
-            # Check wg-quick is installed
             if not shutil.which('wg-quick'):
-                self._safe_after(0, self._ulog,
-                    '✗ wg-quick not installed. Tap ⬇ INSTALL WIREGUARD below.')
+                self._safe_after(0, self._ulog, '✗ wg-quick missing')
                 return
-            # Copy conf to /etc/wireguard/ if not already there
+            
             target = f'/etc/wireguard/{iface}.conf'
             if os.path.exists(conf) and not os.path.exists(target):
-                out, err, rc = run_cmd(
-                    f'sudo mkdir -p /etc/wireguard && '
-                    f'sudo cp "{conf}" "{target}" && sudo chmod 600 "{target}"',
-                    timeout=10)
-                if rc == 0:
-                    self._safe_after(0, self._ulog, f'Copied config to {target}')
-                else:
-                    self._safe_after(0, self._ulog, f'Note: {err or out}')
-            # Bring up the tunnel
-            out, err, rc = run_cmd(f'sudo wg-quick up {iface}', timeout=30)
-            result = out or err or f'exit={rc}'
-            self._safe_after(0, self._ulog, ('✓ Connected: ' if rc==0 else '✗ Failed: ') + result[:150])
-            self._safe_after(800, lambda: threading.Thread(
-                target=self._bg_refresh, daemon=True).start())
+                # We still need to chain commands, but we can do it more safely
+                # Or just run them one by one
+                run_cmd(['sudo', 'mkdir', '-p', '/etc/wireguard'])
+                run_cmd(['sudo', 'cp', conf, target])
+                run_cmd(['sudo', 'chmod', '600', target])
+            
+            out, err, rc = run_cmd(['sudo', 'wg-quick', 'up', iface], timeout=30)
+            self._safe_after(0, self._ulog, ('✓ Connected' if rc==0 else f'✗ Failed: {err or out}'))
+            self._safe_after(800, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
         threading.Thread(target=_bg, daemon=True).start()
 
     def _wg_down(self):
         st = get_vpn_status()
         ifaces = st['wireguard_ifaces'] or ([self._get_wg_iface()] if self._get_wg_iface() else [])
-        if not ifaces:
-            self._ulog('No active WireGuard interface.')
-            return
+        if not ifaces: return
         def _bg():
             for iface in ifaces:
-                out, err, rc = run_cmd(f'sudo wg-quick down {iface}', timeout=15)
-                self._safe_after(0, self._ulog, f'{iface}: {out or err or "Done"}')
+                if iface and re.match(r'^[a-zA-Z0-9.\-_]+$', iface):
+                    run_cmd(['sudo', 'wg-quick', 'down', iface], timeout=15)
             self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
-        threading.Thread(target=_bg, daemon=True).start()
-
-    def _wg_status(self):
-        def _bg():
-            out, err, _ = run_cmd('sudo wg show', timeout=8)
-            self._safe_after(0, self._ulog, out or err or 'No active WireGuard tunnels')
         threading.Thread(target=_bg, daemon=True).start()
 
     def _ov_connect(self):
         conf = self._ov_var.get()
-        if conf == NONE_LABEL or not conf:
-            self._ulog('No .ovpn file selected. Download from your VPN provider and place in ~/vpn/')
-            return
+        if conf == NONE_LABEL or not conf: return
         self._ulog(f'Connecting OpenVPN: {os.path.basename(conf)}')
         def _bg():
-            out, err, rc = run_cmd(
-                f'sudo openvpn --config "{conf}" --daemon '
-                f'--log /tmp/mint_scan_openvpn.log --writepid /tmp/mint_scan_ov.pid',
-                timeout=20)
-            time.sleep(2)
-            self._safe_after(0, self._ulog, '✓ OpenVPN daemon started' if rc==0 else f'✗ {out or err}')
+            cmd = [
+                'sudo', 'openvpn', '--config', conf, '--daemon',
+                '--log', '/tmp/mint_scan_openvpn.log',
+                '--writepid', '/tmp/mint_scan_ov.pid'
+            ]
+            out, err, rc = run_cmd(cmd, timeout=20)
+            self._safe_after(0, self._ulog, '✓ OpenVPN started' if rc==0 else f'✗ {err or out}')
             self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
         threading.Thread(target=_bg, daemon=True).start()
 
     def _ov_disconnect(self):
         self._ulog('Disconnecting OpenVPN...')
         def _bg():
-            if self._ov_proc:
-                try: self._ov_proc.terminate()
-                except Exception: pass
-                self._ov_proc = None
-            run_cmd('sudo killall openvpn 2>/dev/null', timeout=10)
+            run_cmd(['sudo', 'killall', 'openvpn'], timeout=10)
             self._safe_after(0, self._ulog, 'OpenVPN terminated')
             self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
         threading.Thread(target=_bg, daemon=True).start()
 
     def _nm_connect(self):
         name = self._nm_var.get()
-        if name == NONE_LABEL or not name:
-            self._ulog('No NetworkManager VPN selected.')
-            return
+        if name == NONE_LABEL or not name: return
         self._ulog(f'Connecting NM VPN: {name}')
         def _bg():
-            out, err, rc = run_cmd(f'nmcli con up "{name}"', timeout=30)
-            self._safe_after(0, self._ulog, out or err or f'Exit: {rc}')
+            out, err, rc = run_cmd(['nmcli', 'con', 'up', name], timeout=30)
+            self._safe_after(0, self._ulog, '✓ Connected' if rc==0 else f'✗ {err or out}')
             self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
         threading.Thread(target=_bg, daemon=True).start()
 
     def _nm_disconnect(self):
         name = self._nm_var.get()
-        if name == NONE_LABEL: return
-        self._ulog(f'Disconnecting NM VPN: {name}')
+        if name == NONE_LABEL or not name: return
         def _bg():
-            run_cmd(f'nmcli con down "{name}"', timeout=15)
-            self._safe_after(0, self._ulog, f'NM VPN disconnected: {name}')
+            run_cmd(['nmcli', 'con', 'down', name], timeout=15)
             self._safe_after(500, lambda: threading.Thread(target=self._bg_refresh, daemon=True).start())
         threading.Thread(target=_bg, daemon=True).start()
 

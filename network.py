@@ -728,7 +728,7 @@ class NetworkScreen(ctk.CTkFrame):
 
     def _do_capture(self):
         import subprocess
-        tcpdump = run_cmd('which tcpdump')[0].strip()
+        tcpdump = run_cmd(['which', 'tcpdump'])[0].strip()
         cmd = (f'sudo {tcpdump} -l -n -q -c 500 2>/dev/null'
                if tcpdump else 'ss -tnp 2>/dev/null')
         try:

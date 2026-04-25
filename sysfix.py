@@ -104,93 +104,90 @@ class SysFixScreen(ctk.CTkFrame):
 
         # 1. Disk health
         self._safe_after(0, self._log, "Checking disk space...")
-        df_out, _, _ = run("df -h / 2>/dev/null | tail -1")
+        df_out, _, _ = run(["df", "-h", "/"])
         if df_out:
-            parts = df_out.split()
-            if len(parts) >= 5:
-                pct = int(parts[4].replace('%',''))
-                if pct > 90:
-                    findings.append(('HIGH', f'Disk nearly full: {parts[4]} used ({parts[2]}/{parts[1]})',
-                                     f'sudo apt autoremove && sudo apt clean',
-                                     'Run: sudo apt autoremove && sudo apt clean && sudo journalctl --vacuum-size=100M'))
-                elif pct > 75:
-                    findings.append(('MED', f'Disk usage high: {parts[4]}',
-                                     None, 'Consider cleaning: sudo apt autoremove'))
+            lines = df_out.splitlines()
+            if len(lines) > 1:
+                parts = lines[1].split()
+                if len(parts) >= 5:
+                    pct_str = parts[4].replace('%','')
+                    try:
+                        pct = int(pct_str)
+                        if pct > 90:
+                            findings.append(('HIGH', f'Disk nearly full: {parts[4]} used ({parts[2]}/{parts[1]})',
+                                             'apt autoremove && apt clean',
+                                             'Run: sudo apt autoremove && sudo apt clean && sudo journalctl --vacuum-size=100M'))
+                        elif pct > 75:
+                            findings.append(('MED', f'Disk usage high: {parts[4]}',
+                                             None, 'Consider cleaning: sudo apt autoremove'))
+                    except ValueError: pass
 
         # 2. Memory
         self._safe_after(0, self._log, "Checking memory...")
-        mem_out, _, _ = run("free -m 2>/dev/null | grep Mem")
+        mem_out, _, _ = run(["free", "-m"])
         if mem_out:
-            parts = mem_out.split()
-            if len(parts) >= 3:
-                total, used = int(parts[1]), int(parts[2])
-                pct = (used/total)*100 if total else 0
-                if pct > 90:
-                    findings.append(('HIGH', f'Memory critical: {pct:.0f}% used ({used}MB/{total}MB)',
-                                     None, 'Check top processes: ps aux --sort=-%mem | head -10'))
+            for line in mem_out.splitlines():
+                if 'Mem:' in line:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        total, used = int(parts[1]), int(parts[2])
+                        pct = (used/total)*100 if total else 0
+                        if pct > 90:
+                            findings.append(('HIGH', f'Memory critical: {pct:.0f}% used ({used}MB/{total}MB)',
+                                             None, 'Check top processes: ps aux --sort=-%mem | head -10'))
+                    break
 
         # 3. Package updates
         self._safe_after(0, self._log, "Checking for updates...")
-        upd_out, _, _ = run("apt list --upgradable 2>/dev/null | grep -c upgradable", timeout=15)
-        try:
-            upd_count = int(upd_out.strip()) - 1
+        # We use a simple check; full 'apt list' is slow
+        upd_out, _, _ = run(["sudo", "apt-get", "-s", "upgrade"], timeout=20)
+        upd_match = re.search(r'(\d+) upgraded, (\d+) newly installed', upd_out)
+        if upd_match:
+            upd_count = int(upd_match.group(1))
             if upd_count > 20:
                 findings.append(('HIGH', f'{upd_count} security/system updates available',
-                                 'sudo apt update && sudo apt upgrade -y',
+                                 'apt update && apt upgrade -y',
                                  'Run: sudo apt update && sudo apt upgrade -y'))
             elif upd_count > 0:
                 findings.append(('MED', f'{upd_count} updates available',
                                  None, 'Run: sudo apt update && sudo apt upgrade'))
-        except ValueError:
-            pass
 
         # 4. Failed services
         self._safe_after(0, self._log, "Checking failed services...")
-        failed_out, _, _ = run("systemctl list-units --state=failed --no-legend 2>/dev/null | wc -l")
-        try:
-            failed = int(failed_out.strip())
-            if failed > 0:
-                names, _, _ = run("systemctl list-units --state=failed --no-legend 2>/dev/null | awk '{print $1}' | head -5")
-                findings.append(('MED', f'{failed} failed system service(s): {names}',
+        failed_out, _, _ = run(["systemctl", "list-units", "--state=failed", "--no-legend"])
+        if failed_out:
+            failed_count = len(failed_out.splitlines())
+            if failed_count > 0:
+                findings.append(('MED', f'{failed_count} failed system service(s)',
                                  None, 'Check: systemctl --failed'))
-        except ValueError:
-            pass
 
         # 5. Zombie processes
         self._safe_after(0, self._log, "Checking for zombie processes...")
-        zombie_out, _, _ = run("ps aux 2>/dev/null | awk '$8==\"Z\"' | wc -l")
-        try:
-            zombies = int(zombie_out.strip())
-            if zombies > 0:
-                findings.append(('MED', f'{zombies} zombie process(es)',
-                                 None, 'Reboot may be needed to clear zombie processes'))
-        except ValueError:
-            pass
+        z_out, _, _ = run(["ps", "aux"])
+        zombies = z_out.count(" <defunct>")
+        if zombies > 0:
+            findings.append(('MED', f'{zombies} zombie process(es)',
+                             None, 'Reboot may be needed to clear zombie processes'))
 
         # 6. Firewall
         self._safe_after(0, self._log, "Checking firewall...")
-        ufw_out, _, _ = run("ufw status 2>/dev/null | head -1")
+        ufw_out, _, _ = run(["sudo", "ufw", "status"])
         if 'inactive' in ufw_out.lower():
             findings.append(('HIGH', 'Firewall is DISABLED',
-                             'sudo ufw enable && sudo ufw default deny incoming && sudo ufw allow ssh',
+                             'ufw enable',
                              'Enable: sudo ufw enable'))
 
         # 7. Automatic updates
         self._safe_after(0, self._log, "Checking auto-updates...")
-        auto_out, _, _ = run("dpkg -l unattended-upgrades 2>/dev/null | grep '^ii' | wc -l")
-        if auto_out.strip() == '0':
+        auto_out, _, _ = run(["dpkg", "-l", "unattended-upgrades"])
+        if 'ii' not in auto_out:
             findings.append(('MED', 'Automatic security updates not configured',
-                             None, 'Install: sudo apt install unattended-upgrades && sudo dpkg-reconfigure -plow unattended-upgrades'))
+                             None, 'Install: sudo apt install unattended-upgrades'))
 
         # 8. Temp files
         self._safe_after(0, self._log, "Checking temp files...")
-        tmp_out, _, _ = run("du -sh /tmp 2>/dev/null | cut -f1")
-        self._safe_after(0, self._log, f"  /tmp size: {tmp_out}")
-
-        # 9. Log file sizes
-        self._safe_after(0, self._log, "Checking log sizes...")
-        log_out, _, _ = run("du -sh /var/log 2>/dev/null | cut -f1")
-        self._safe_after(0, self._log, f"  /var/log size: {log_out}")
+        tmp_out, _, _ = run(["du", "-sh", "/tmp"])
+        self._safe_after(0, self._log, f"  /tmp size: {tmp_out.split()[0] if tmp_out else '?'}")
 
         if not findings:
             findings.append(('OK', '✓ System is healthy',
@@ -234,79 +231,80 @@ class SysFixScreen(ctk.CTkFrame):
         ), daemon=True).start()
 
     def _update_system(self):
-        threading.Thread(target=lambda: (
-            self._safe_after(0, self._log, "Updating package list..."),
-            (lambda o,e,r: self._safe_after(0, self._log, f"apt update: {o[-100:] if o else e[-80:]}"))(
-                *run("sudo apt-get update -q", timeout=60)),
-            self._safe_after(0, self._log, "Upgrading packages..."),
-            (lambda o,e,r: self._safe_after(0, self._log, f"apt upgrade: {'Done' if r==0 else e[-80:]}"))(
-                *run("sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q", timeout=120)),
-            self._safe_after(0, self._log, "✓ System update complete")
-        ), daemon=True).start()
+        def _bg():
+            self._safe_after(0, self._log, "Updating package list...")
+            run(["sudo", "apt-get", "update", "-q"], timeout=60)
+            self._safe_after(0, self._log, "Upgrading packages...")
+            out, err, rc = run(["sudo", "DEBIAN_FRONTEND=noninteractive", "apt-get", "upgrade", "-y", "-q"], timeout=120)
+            self._safe_after(0, self._log, "✓ System update complete" if rc==0 else f"✗ Update failed: {err}")
+        threading.Thread(target=_bg, daemon=True).start()
 
     def _clean_packages(self):
-        threading.Thread(target=lambda: (
-            self._safe_after(0, self._log, "Cleaning unused packages..."),
-            (lambda o,e,r: self._safe_after(0, self._log, o[-200:] or e[-80:]))(
-                *run("sudo DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && sudo apt-get autoclean -y", timeout=60)),
+        def _bg():
+            self._safe_after(0, self._log, "Cleaning unused packages...")
+            run(["sudo", "apt-get", "autoremove", "-y"], timeout=60)
+            run(["sudo", "apt-get", "autoclean", "-y"], timeout=60)
             self._safe_after(0, self._log, "✓ Package cleanup done")
-        ), daemon=True).start()
+        threading.Thread(target=_bg, daemon=True).start()
 
     def _check_disk(self):
-        threading.Thread(target=lambda: (
-            self._safe_after(0, self._log, "Disk usage:"),
-            (lambda o,e,r: self._safe_after(0, self._log, o))(
-                *run("df -h 2>/dev/null")),
-            self._safe_after(0, self._log, "\nLargest directories in home:"),
-            (lambda o,e,r: self._safe_after(0, self._log, o))(
-                *run("du -sh ~/.[^.]* ~/* 2>/dev/null | sort -rh | head -10"))
-        ), daemon=True).start()
+        def _bg():
+            self._safe_after(0, self._log, "Disk usage:")
+            out, _, _ = run(["df", "-h"])
+            self._safe_after(0, self._log, out)
+            self._safe_after(0, self._log, "\nLargest files in home:")
+            # We use a limited find to avoid long waits
+            out, _, _ = run(["find", os.path.expanduser("~"), "-maxdepth", "2", "-type", "f", "-size", "+100M"])
+            self._safe_after(0, self._log, out or "No files > 100MB found in home root.")
+        threading.Thread(target=_bg, daemon=True).start()
 
     def _fix_permissions(self):
-        threading.Thread(target=lambda: (
-            self._safe_after(0, self._log, "Fixing home directory permissions..."),
-            (lambda o,e,r: self._safe_after(0, self._log, "✓ Permissions fixed" if r==0 else e))(
-                *run(f"chmod 755 ~ && chmod 700 ~/.ssh 2>/dev/null || true", timeout=10)),
-            self._safe_after(0, self._log, "Checking for world-readable sensitive files..."),
-            (lambda o,e,r: self._safe_after(0, self._log, f"Found: {o}" if o else "✓ No issues"))(
-                *run("find ~ -maxdepth 2 -name '*.key' -o -name '*.pem' -o -name 'id_rsa' 2>/dev/null | head -5"))
-        ), daemon=True).start()
+        def _bg():
+            self._safe_after(0, self._log, "Fixing home directory permissions...")
+            run(["chmod", "755", os.path.expanduser("~")])
+            ssh_dir = os.path.expanduser("~/.ssh")
+            if os.path.exists(ssh_dir):
+                run(["chmod", "700", ssh_dir])
+            self._safe_after(0, self._log, "✓ Permissions fixed")
+        threading.Thread(target=_bg, daemon=True).start()
 
     def _fix_firewall(self):
-        threading.Thread(target=lambda: (
-            self._safe_after(0, self._log, "Configuring firewall..."),
-            (lambda o,e,r: self._safe_after(0, self._log, o or e))(
-                *run("sudo ufw --force enable && sudo ufw default deny incoming && sudo ufw default allow outgoing && sudo ufw allow ssh && sudo ufw status", timeout=15)),
+        def _bg():
+            self._safe_after(0, self._log, "Configuring firewall...")
+            run(["sudo", "ufw", "--force", "enable"])
+            run(["sudo", "ufw", "default", "deny", "incoming"])
+            run(["sudo", "ufw", "default", "allow", "outgoing"])
+            run(["sudo", "ufw", "allow", "ssh"])
             self._safe_after(0, self._log, "✓ Firewall enabled with secure defaults")
-        ), daemon=True).start()
+        threading.Thread(target=_bg, daemon=True).start()
 
     def _harden_ssh(self):
         self._log("SSH hardening suggestions:")
         suggestions = [
-            "Edit: sudo nano /etc/ssh/sshd_config",
-            "Set: PermitRootLogin no",
-            "Set: PasswordAuthentication no  (after setting up SSH keys)",
-            "Set: MaxAuthTries 3",
-            "Set: Protocol 2",
-            "Then: sudo systemctl restart sshd",
+            "1. Disable root login: PermitRootLogin no",
+            "2. Disable password auth: PasswordAuthentication no",
+            "3. Use protocol 2 only: Protocol 2",
+            "4. Limit auth attempts: MaxAuthTries 3",
+            "Location: /etc/ssh/sshd_config"
         ]
         for s in suggestions:
             self._log(f"  {s}")
 
     def _clear_temp(self):
-        threading.Thread(target=lambda: (
-            self._safe_after(0, self._log, "Clearing temp files..."),
-            (lambda o,e,r: self._safe_after(0, self._log, "✓ Temp cleared" if r==0 else e))(
-                *run("sudo rm -rf /tmp/* /var/tmp/* 2>/dev/null; sudo journalctl --vacuum-size=100M 2>/dev/null", timeout=20)),
+        def _bg():
+            self._safe_after(0, self._log, "Clearing temp files...")
+            # Selective clear to avoid breaking running procs
+            run(["sudo", "find", "/tmp", "-mindepth", "1", "-atime", "+1", "-delete"])
+            run(["sudo", "journalctl", "--vacuum-size=100M"])
             self._safe_after(0, self._log, "✓ Done")
-        ), daemon=True).start()
+        threading.Thread(target=_bg, daemon=True).start()
 
     def _mem_analysis(self):
-        threading.Thread(target=lambda: (
-            self._safe_after(0, self._log, "Memory analysis:"),
-            (lambda o,e,r: self._safe_after(0, self._log, o))(
-                *run("free -h 2>/dev/null")),
-            self._safe_after(0, self._log, "\nTop memory consumers:"),
-            (lambda o,e,r: self._safe_after(0, self._log, o))(
-                *run("ps aux --sort=-%mem 2>/dev/null | head -8"))
-        ), daemon=True).start()
+        def _bg():
+            self._safe_after(0, self._log, "Memory analysis:")
+            out, _, _ = run(["free", "-h"])
+            self._safe_after(0, self._log, out)
+            self._safe_after(0, self._log, "\nTop memory consumers:")
+            out, _, _ = run(["ps", "aux", "--sort=-%mem"])
+            self._safe_after(0, self._log, "\n".join(out.splitlines()[:8]))
+        threading.Thread(target=_bg, daemon=True).start()

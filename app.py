@@ -25,6 +25,14 @@ BOOT_LINES = [
     "✓ ALL SYSTEMS READY — v8.1",
 ]
 
+# Tab organization by categories
+TAB_CATEGORIES = [
+    ('HEALTH',   ['dash', 'battery', 'sysfix', 'daemon', 'updater', 'plugins', 'marketplace', 'settings']),
+    ('NETWORK',  ['wifi', 'network', 'netscan', 'ports', 'wireless', 'devscan', 'webmonitor', 'vpn']),
+    ('SECURITY', ['malware', 'threats', 'guardian', 'ids', 'auditor', 'cvelookup', 'firewall', 'perms']),
+    ('TOOLS',    ['toolbox', 'investigate', 'secureerase', 'usb', 'recovery', 'terminal', 'calls', 'notifs']),
+]
+
 ALL_TABS = [
     ('dash',        'Dashboard',    '⬡'),
     ('perms',       'Permissions',  '🔑'),
@@ -218,7 +226,7 @@ class MintScanApp:
             try:
                 from plugins import load_all, broadcast_event
                 results = load_all()
-                broadcast_event('app_start', {'version': '8.1'})
+                broadcast_event('app_start', {'version': '8.2'})
                 _log.info(f'Plugins: {len(results)} loaded')
             except Exception as e:
                 _log.debug(f'Plugins: {e}')
@@ -280,28 +288,37 @@ class MintScanApp:
         # Sidebar
         self.sidebar = ScrollableFrame(self.container, width=190, fg_color=C['sf'], corner_radius=0)
         self.sidebar.pack(fill='y', side='left')
-        ctk.CTkLabel(self.sidebar, text="NAVIGATION",
-                     font=(FONT, 8, 'bold'), text_color=C['mu']
-                     ).pack(anchor='w', padx=12, pady=(10, 4))
 
         # Content area
         self.content = ctk.CTkFrame(self.container, fg_color=C['bg'], corner_radius=0)
         self.content.pack(fill='both', expand=True, side='left')
 
-        # Build sidebar buttons for all loaded screens
-        visible_tabs = [(k, lbl, icon) for k, lbl, icon in ALL_TABS
-                        if k in self._screen_classes]
-
+        # Build sidebar buttons grouped by categories
         self._tab_btns = {}
-        for key, label, icon in visible_tabs:
-            btn = ctk.CTkButton(
-                self.sidebar, text=f" {icon}  {label}",
-                font=(FONT, 10), height=36, anchor='w',
-                fg_color=C['bg'], hover_color=C['s2'],
-                text_color=C['mu'], corner_radius=6, border_width=0,
-                command=lambda k=key: self._switch_tab(k))
-            btn.pack(fill='x', padx=6, pady=1)
-            self._tab_btns[key] = btn
+        tab_map = {k: (lbl, icon) for k, lbl, icon in ALL_TABS}
+
+        for cat_name, keys in TAB_CATEGORIES:
+            # Header
+            ctk.CTkLabel(self.sidebar, text=cat_name,
+                         font=(FONT, 8, 'bold'), text_color=C['mu']
+                         ).pack(anchor='w', padx=12, pady=(12, 4))
+            
+            for key in keys:
+                if key not in self._screen_classes:
+                    continue
+                label, icon = tab_map[key]
+                btn = ctk.CTkButton(
+                    self.sidebar, text=f" {icon}  {label}",
+                    font=(FONT, 10), height=36, anchor='w',
+                    fg_color=C['bg'], hover_color=C['s2'],
+                    text_color=C['mu'], corner_radius=6, border_width=0,
+                    command=lambda k=key: self._switch_tab(k))
+                btn.pack(fill='x', padx=6, pady=1)
+                self._tab_btns[key] = btn
+            
+            # Separator
+            ctk.CTkFrame(self.sidebar, height=1, fg_color=C['br'], corner_radius=0
+                         ).pack(fill='x', padx=12, pady=6)
 
         ctk.CTkFrame(self.sidebar, height=1, fg_color=C['br']).pack(fill='x', side='bottom', pady=(0, 8))
         ctk.CTkLabel(self.sidebar, text="MINT PROJECTS  •  PTY",

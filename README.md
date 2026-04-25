@@ -1,7 +1,16 @@
-# Mint Scan v8 — Advanced Linux Security Auditor
+# Mint Scan v8.2 — World-Standard Linux Security Auditor
 **Mint Projects PTY (Ltd) · Pretoria, South Africa · 2026**
 
-## Installation (git clone only)
+Mint Scan v8.2 is an advanced security and system utility suite for Linux, featuring **comprehensive security hardening** against shell injection and unauthorized elevation.
+
+## 🚀 NEW IN v8.2
+- **Security Hardening:** Refactored `run_cmd` for list-based secure execution.
+- **Injection Protection:** Sanitized inputs for VPN, IDS, and Malware modules.
+- **Categorized UI:** 30+ screens organized into Health, Network, Security, and Tools.
+- **API Optimization:** NIST NVD live lookups with exponential backoff and caching.
+
+## 📖 Comprehensive Guide
+For a full walkthrough of features and advanced setup, see: **[GUIDE.md](./GUIDE.md)**
 
 ```bash
 git clone https://github.com/mintpro004/mint-scan-linux-V8.git ~/mint-scan-linux
