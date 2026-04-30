@@ -146,14 +146,10 @@ class Card:
             corner_radius=cr, border_width=0)
         self._inner.pack(fill='both', expand=True, padx=(0, 1), pady=(0, 1))
 
-    # ── Child placement — delegate to inner surface ───────────────
-    # This makes  ctk.CTkLabel(card, ...).pack()  work as expected.
-    @property
-    def _w(self):           return self._inner._w
-    @property
-    def _name(self):        return self._inner._name
-    @property
-    def master(self):       return self._inner.master
+        # ── tkinter master protocol ───────────────────────────────
+        self._w = self._inner._w
+        self._name = self._inner._name
+        self.master = self._inner.master
 
     def winfo_exists(self):
         try: return self._shell.winfo_exists()
@@ -208,10 +204,8 @@ class Card:
     # the parent widget name. We forward this to self._inner.
     def __getattr__(self, name):
         # Delegate unknown attrs to the inner CTkFrame
-        # This handles _w, tk, _last_child_ids etc.
-        if name.startswith('_') or name in ('tk', 'children'):
-            return getattr(self._inner, name)
-        raise AttributeError(f"Card has no attribute '{name}'")
+        # This handles tk, children, winfo_*, etc.
+        return getattr(self._inner, name)
 
     @property
     def interior(self):
