@@ -43,6 +43,12 @@ else
 fi
 
 # ── [1/7] Ownership fix ──────────────────────────────────────────
+
+# Remove development/test files that should not be in production
+for testfile in reproduce_injection.py test_fix.py; do
+    [ -f "$testfile" ] && rm -f "$testfile" && echo "  Removed: $testfile"
+done
+
 echo "[1/7] Fixing ownership..."
 sudo chown -R "$USER:$USER" "$SCRIPT_DIR" 2>/dev/null || true
 echo "  ✓ Done"

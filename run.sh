@@ -50,8 +50,11 @@ HEAL=false
 [ ! -d "venv" ] && HEAL=true
 python3 -m py_compile widgets.py 2>/dev/null || HEAL=true
 ! grep -q "class Card" widgets.py 2>/dev/null && HEAL=true
-# Detect old broken Card (subclasses CTkFrame — causes _w crash)
-grep -q "super().__init__.*self\._hl" widgets.py 2>/dev/null && HEAL=true
+# Detect broken Card implementations that cause runtime crashes:
+# Pattern 1: plain object Card with def _w(self) method → TypeError: method + str
+grep -q "def _w(self)" widgets.py 2>/dev/null && HEAL=true
+# Pattern 2: Card calls super().pack() in __init__ → AttributeError: property has no setter  
+grep -A 30 "class Card" widgets.py 2>/dev/null | grep -q "super().pack()" && HEAL=true
 
 if [ "$HEAL" = true ]; then
     echo -e "${CYAN}[ MINT SCAN ]${NC} Self-healing — running installer..."

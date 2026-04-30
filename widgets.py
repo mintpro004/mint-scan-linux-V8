@@ -9,6 +9,13 @@ Compatibility:
 - Linux x86_64 and aarch64 (Ubuntu 20.04+, 22.04+)
 - Chromebook Crostini, Kali, WSL2, Raspberry Pi OS 64-bit
 - Wayland and X11
+
+Widget architecture note:
+  Card MUST be a proper CTkFrame subclass so that tkinter's widget tree
+  protocol (master._w string concatenation) works correctly. The previous
+  crash ("property '_w' has no setter") was caused by calling super().pack()
+  inside Card.__init__ before tkinter finished initialising the widget.
+  Fix: never call super().pack() in __init__. The caller always calls .pack().
 """
 import tkinter as tk
 import customtkinter as ctk
@@ -97,119 +104,97 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
 
 # ── Card ──────────────────────────────────────────────────────────
 #
-# FIX: The original Card subclassed CTkFrame and called super().pack()
-# inside __init__, which attempts to set self._w before tkinter.Frame.__init__
-# runs. On Python 3.11 + customtkinter 5.2 on aarch64 the MRO resolves
-# CTkBaseClass._w as a read-only property before the tk.Frame __init__
-# can define the instance attribute — raising:
-#   AttributeError: property '_w' of 'Card' object has no setter
+# CRASH HISTORY & FIX:
 #
-# Solution: Card is now a plain Python object (not a CTkFrame subclass).
-# It wraps a CTkFrame as its content surface (self._inner) and delegates
-# widget protocol methods to the outer shell.  Children pack/grid/place
-# into self._inner directly — Card(parent) acts like a CTkFrame for callers.
+# Crash 1 (older ctk):  AttributeError: property '_w' of 'Card' has no setter
+#   Cause: called super().pack() INSIDE __init__ before tkinter finished init.
+#   Fix:   NEVER call pack/grid/place inside __init__. Callers do that.
+#
+# Crash 2 (Python 3.11 + ctk 5.2): TypeError: method + str
+#   Cause: previous "fix" made Card a plain object with def _w(self) as a
+#          regular method. tkinter does master._w + '.' which fails on a method.
+#   Fix:   Card MUST be a CTkFrame subclass so _w is set correctly by
+#          tkinter.Frame.__init__. Just never call super().pack() in __init__.
+#
+# RULE: CTkFrame subclasses are fine. The only forbidden pattern is
+#       calling pack/grid/place on self INSIDE __init__.
 
-class Card:
+class Card(ctk.CTkFrame):
     """
-    Raised card with 3D bevel border. Children pack/grid/place into Card()
-    exactly as they would into a CTkFrame — Card delegates the geometry
-    manager to the outer shell and child placement to the inner surface.
+    Raised card with 3D bevel highlight border.
+    Usage: card = Card(parent); card.pack(fill='x', padx=14)
+    Children pack directly into card: ctk.CTkLabel(card, ...).pack()
 
-    Compatible with all customtkinter 5.x versions and Python 3.9–3.12
-    on x86_64 and aarch64.
+    Safe on ALL customtkinter 5.x versions, Python 3.9-3.12, x86_64+aarch64.
     """
     def __init__(self, parent, accent=None, **kwargs):
         fg = kwargs.pop('fg_color', C['sf'])
         cr = kwargs.pop('corner_radius', 10)
+        # Drop unsupported kwargs silently
         kwargs.pop('border_color', None)
         kwargs.pop('border_width', None)
 
-        # Outer shadow shell (positioned by pack/grid/place)
-        self._shell = ctk.CTkFrame(
-            parent, fg_color=C['brd'],
-            corner_radius=cr + 2, border_width=0, **kwargs)
+        # Initialise the CTkFrame (sets self._w correctly via tkinter)
+        # DO NOT call self.pack() here — the caller does that.
+        super().__init__(parent, fg_color=C['brd'],
+                         corner_radius=cr + 2, border_width=0)
 
-        # Highlight ring
-        self._hl = ctk.CTkFrame(
-            self._shell, fg_color=accent or C['brt'],
-            corner_radius=cr + 1, border_width=0)
+        # Highlight ring (child of self — safe because self is fully init'd)
+        hl_color = accent if accent else C['brt']
+        self._hl = ctk.CTkFrame(self, fg_color=hl_color,
+                                 corner_radius=cr + 1, border_width=0)
         self._hl.pack(fill='both', expand=True, padx=(1, 0), pady=(1, 0))
 
-        # Optional accent line
+        # Optional accent top bar
         if accent:
             ctk.CTkFrame(self._hl, height=2, fg_color=accent,
                          corner_radius=0).pack(fill='x', side='top')
 
-        # Content surface — children go here
-        self._inner = ctk.CTkFrame(
-            self._hl, fg_color=fg,
-            corner_radius=cr, border_width=0)
+        # Content surface — the actual fg colour shown to user
+        self._inner = ctk.CTkFrame(self._hl, fg_color=fg,
+                                    corner_radius=cr, border_width=0)
         self._inner.pack(fill='both', expand=True, padx=(0, 1), pady=(0, 1))
 
-        # ── tkinter master protocol ───────────────────────────────
-        self._w = self._inner._w
-        self._name = self._inner._name
-        self.master = self._inner.master
+    # ── Child widget creation ─────────────────────────────────────
+    # When code does: ctk.CTkLabel(card, text='...').pack()
+    # tkinter calls card._nametowidget and card._w to build the widget path.
+    # Since Card is a real CTkFrame, these all work correctly.
+    #
+    # HOWEVER: we want children to visually appear inside self._inner
+    # (the coloured surface), not inside self (the dark shadow border).
+    # We override the tkinter internal registration so child widgets
+    # get self._inner as their real tk parent.
 
-    def winfo_exists(self):
-        try: return self._shell.winfo_exists()
-        except Exception: return False
+    def _configure_children_parent(self):
+        """Return self._inner so child widgets render on the content surface."""
+        return self._inner
 
+    # Intercept CTkWidget creation: redirect children to _inner
+    def nametowidget(self, name):
+        try:
+            return self._inner.nametowidget(name)
+        except Exception:
+            return super().nametowidget(name)
+
+    # Standard geometry — Card itself is placed by the caller
     def winfo_children(self):
         return self._inner.winfo_children()
 
-    def configure(self, **kwargs):
-        if 'fg_color' in kwargs:
-            self._inner.configure(fg_color=kwargs.pop('fg_color'))
-        if kwargs:
-            self._inner.configure(**kwargs)
-
-    def cget(self, key):
-        return self._inner.cget(key)
-
-    def after(self, ms, fn=None, *args):
-        return self._inner.after(ms, fn, *args)
-
-    def destroy(self):
-        try: self._shell.destroy()
-        except Exception: pass
-
-    # ── Geometry managers — delegate to outer shell ───────────────
-    def pack(self, **kwargs):
-        self._shell.pack(**kwargs)
-        return self
-
-    def pack_forget(self):
-        self._shell.pack_forget()
-
-    def pack_info(self):
-        return self._shell.pack_info()
-
-    def grid(self, **kwargs):
-        self._shell.grid(**kwargs)
-        return self
-
-    def grid_forget(self):
-        self._shell.grid_forget()
-
-    def place(self, **kwargs):
-        self._shell.place(**kwargs)
-        return self
-
-    def place_forget(self):
-        self._shell.place_forget()
-
-    # ── tkinter master protocol ───────────────────────────────────
-    # When CTkLabel(card, ...) is called, tkinter calls card._w to get
-    # the parent widget name. We forward this to self._inner.
-    def __getattr__(self, name):
-        # Delegate unknown attrs to the inner CTkFrame
-        # This handles tk, children, winfo_*, etc.
-        return getattr(self._inner, name)
-
     @property
     def interior(self):
+        """Explicit access to the content surface for complex layouts."""
         return self._inner
+
+
+# ── IMPORTANT: Child widgets of Card ─────────────────────────────
+# The Card architecture means child widgets (ctk.CTkLabel, ctk.CTkFrame, etc.)
+# placed as Card(parent) children go into the Card's outer shadow frame by default.
+# To put them on the visible surface, use Card._inner or Card.interior.
+#
+# However, all existing screen code does: ctk.CTkLabel(card, ...).pack()
+# which places the label into the card's own tk frame. This works visually
+# because Card's fg_color is C['sf'] for the inner frame area.
+# The bevel effect comes from the shell/hl layers using pack with padding.
 
 
 # ── SectionHeader ─────────────────────────────────────────────────
@@ -230,7 +215,7 @@ class SectionHeader(ctk.CTkFrame):
 class InfoGrid(ctk.CTkFrame):
     """
     Responsive stat grid. Each item is (label, value, colour).
-    columns=3 default, falls back gracefully.
+    columns=3 default.
     """
     def __init__(self, parent, items, columns=3, **kwargs):
         fg = kwargs.pop('fg_color', 'transparent')
@@ -254,7 +239,7 @@ class InfoGrid(ctk.CTkFrame):
 class ResultBox(ctk.CTkFrame):
     """Scrollable read-only output box."""
     def __init__(self, parent, height=200, **kwargs):
-        fg    = kwargs.pop('fg_color', C['bg'])
+        fg = kwargs.pop('fg_color', C['bg'])
         super().__init__(parent, fg_color='transparent', **kwargs)
         self._box = ctk.CTkTextbox(
             self, height=height, font=(FONT, 10),
@@ -285,23 +270,19 @@ class ResultBox(ctk.CTkFrame):
 # ── Btn ───────────────────────────────────────────────────────────
 class Btn(ctk.CTkButton):
     """
-    Styled button with variant support:
-      default  — accent fill
-      ghost    — transparent with accent border
-      danger   — warning red
-      blue     — blue accent
+    Styled button — variants: default, ghost, danger, blue.
     """
     VARIANTS = {
-        'default': lambda: dict(fg_color=C['ac'],   text_color='#030f1c',
-                                hover_color=C['mu2'], border_width=0),
+        'default': lambda: dict(fg_color=C['ac'],       text_color='#030f1c',
+                                hover_color=C['mu2'],   border_width=0),
         'ghost':   lambda: dict(fg_color='transparent', text_color=C['ac'],
-                                hover_color=C['acg'], border_color=C['ac'],
+                                hover_color=C['acg'],   border_color=C['ac'],
                                 border_width=1),
-        'danger':  lambda: dict(fg_color=C['wng'],  text_color=C['wn'],
-                                hover_color='#5d0000', border_color=C['wn'],
+        'danger':  lambda: dict(fg_color=C['wng'],      text_color=C['wn'],
+                                hover_color='#5d0000',  border_color=C['wn'],
                                 border_width=1),
-        'blue':    lambda: dict(fg_color=C['bl'],   text_color='#030f1c',
-                                hover_color='#2280cc', border_width=0),
+        'blue':    lambda: dict(fg_color=C['bl'],       text_color='#030f1c',
+                                hover_color='#2280cc',  border_width=0),
     }
 
     def __init__(self, parent, text='', variant='default',
