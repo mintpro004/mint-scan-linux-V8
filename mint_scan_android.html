@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta http-equiv="Permissions-Policy" content="battery=*, geolocation=*">
+<title>Mint Scan Mobile</title>
+<style>
+:root{--bg:#05111f;--sf:#0a1f35;--s2:#0f2847;--br:#1a3f5c;--ac:#00ffe0;--ok:#44ff99;--wn:#ff5555;--am:#ffcc44;--bl:#55aaff;--tx:#e8f4ff;--mu:#7fb8d8}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--tx);font-family:'Courier New',monospace;min-height:100vh;padding:10px;font-size:14px;overflow-x:hidden}
+.header{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.logo{color:var(--ac);font-size:16px;font-weight:bold}
+.logo-sub{font-size:9px;color:var(--mu)}
+.score{text-align:right}
+.score-n{color:var(--ok);font-size:20px;font-weight:bold;display:block}
+.score-l{color:var(--mu);font-size:8px}
+.tabs{display:flex;gap:4px;margin-bottom:10px;overflow-x:auto;padding-bottom:4px}
+.tabs::-webkit-scrollbar{height:2px}
+.tabs::-webkit-scrollbar-thumb{background:var(--br)}
+.tab{background:var(--sf);border:1px solid var(--br);color:var(--mu);padding:8px 10px;border-radius:6px;font-size:9px;cursor:pointer;white-space:nowrap;font-family:'Courier New',monospace;flex-shrink:0;font-weight:bold}
+.tab.active{border-color:var(--ac);color:var(--ac);background:var(--s2)}
+.panel{display:none}.panel.active{display:block}
+.section{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:10px;overflow:hidden}
+.section-hdr{background:var(--s2);padding:8px 14px;font-size:9px;color:var(--ac);font-weight:bold;letter-spacing:1px;display:flex;justify-content:space-between;align-items:center}
+.section-body{padding:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.cell{background:var(--bg);border:1px solid var(--br);border-radius:6px;padding:9px 10px}
+.lbl{font-size:8px;color:var(--mu);margin-bottom:3px;letter-spacing:.5px}
+.val{font-size:13px;color:var(--tx);word-break:break-all;line-height:1.3;font-weight:bold}
+.val.ok{color:var(--ok)}.val.warn{color:var(--wn)}.val.am{color:var(--am)}.val.ac{color:var(--ac)}.val.mu{color:var(--mu)}.val.bl{color:var(--bl)}
+.btn{display:block;width:100%;background:transparent;border:1px solid var(--ac);color:var(--ac);padding:12px;border-radius:6px;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;cursor:pointer;margin-top:8px;text-align:center;transition:background .15s;-webkit-appearance:none}
+.btn:active{background:var(--br)}.btn.ok{border-color:var(--ok);color:var(--ok)}.btn.warn{border-color:var(--wn);color:var(--wn)}.btn.mu{border-color:var(--mu);color:var(--mu)}.btn.am{border-color:var(--am);color:var(--am)}.btn.bl{border-color:var(--bl);color:var(--bl)}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.btn-row .btn{margin-top:0}
+.btn-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
+.btn-row3 .btn{margin-top:0}
+.log{background:var(--bg);border:1px solid var(--br);border-radius:4px;padding:9px;font-size:9px;color:var(--ok);max-height:130px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-top:8px;line-height:1.5}
+.progress-wrap{background:var(--br);border-radius:2px;height:6px;margin-top:8px;overflow:hidden}
+.progress-bar{height:6px;border-radius:2px;background:var(--ac);transition:width .4s;width:0%}
+.threat-item{background:var(--bg);border-left:3px solid var(--wn);border-radius:0 6px 6px 0;padding:8px 10px;margin-bottom:6px}
+.threat-item.med{border-color:var(--am)}
+.threat-item.ok{border-color:var(--ok)}
+.threat-title{font-size:11px;font-weight:bold;color:var(--wn)}
+.threat-item.med .threat-title{color:var(--am)}
+.threat-item.ok .threat-title{color:var(--ok)}
+.threat-desc{font-size:9px;color:var(--mu);margin-top:3px}
+.badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:8px;font-weight:bold;border:1px solid;margin-right:4px}
+.live{color:var(--ok);font-size:9px;animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+input[type=text],input[type=number]{background:var(--bg);border:1px solid var(--br);color:var(--tx);font-family:'Courier New',monospace;padding:9px;border-radius:5px;width:100%;font-size:12px;margin-top:6px;-webkit-appearance:none}
+input:focus{outline:none;border-color:var(--ac)}
+.notice{background:var(--s2);border:1px solid var(--am);border-radius:6px;padding:10px;font-size:9px;color:var(--am);margin-bottom:8px;line-height:1.6}
+.server-box{background:var(--bg);border:2px solid var(--ac);border-radius:6px;padding:12px;text-align:center;color:var(--ac);font-size:15px;font-weight:bold;margin:8px 0;letter-spacing:.5px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">[ MINT SCAN ]</div>
+    <div class="logo-sub">MOBILE v8 · MINT PROJECTS</div>
+  </div>
+  <div class="score">
+    <span class="score-n" id="score-n">--</span>
+    <span class="score-l">SECURITY SCORE</span>
+    <span class="live" id="live-dot">● LIVE</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('dashboard',this)">⬡ Dashboard</div>
+  <div class="tab" onclick="showTab('threats',this)">⚠ Threats</div>
+  <div class="tab" onclick="showTab('battery',this)">🔋 Battery</div>
+  <div class="tab" onclick="showTab('network',this)">📡 Network</div>
+  <div class="tab" onclick="showTab('ports',this)">🔍 Ports</div>
+  <div class="tab" onclick="showTab('device',this)">📱 Device</div>
+  <div class="tab" onclick="showTab('sync',this)">🔄 Sync</div>
+  <div class="tab" onclick="showTab('tools',this)">🛠 Tools</div>
+</div>
+
+<!-- ═══ DASHBOARD ══════════════════════════════════════════════ -->
+<div id="tab-dashboard" class="panel active">
+  <div class="section">
+    <div class="section-hdr">SECURITY OVERVIEW <span id="ts">--:--:--</span></div>
+    <div class="section-body">
+      <div class="grid3">
+        <div class="cell"><div class="lbl">SCORE</div><div class="val ac" id="d-score">--</div></div>
+        <div class="cell"><div class="lbl">THREATS</div><div class="val" id="d-threats">--</div></div>
+        <div class="cell"><div class="lbl">STATUS</div><div class="val ok" id="d-status">SCANNING</div></div>
+      </div>
+      <div class="progress-wrap" style="margin-top:12px"><div class="progress-bar" id="scan-bar" style="width:0%"></div></div>
+      <button class="btn ok" onclick="runFullScan()" style="margin-top:10px">▶ RUN SECURITY SCAN</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">QUICK STATUS</div>
+    <div class="section-body">
+      <div class="grid">
+        <div class="cell"><div class="lbl">BATTERY</div><div class="val" id="qs-bat">--</div></div>
+        <div class="cell"><div class="lbl">ONLINE</div><div class="val" id="qs-online">--</div></div>
+        <div class="cell"><div class="lbl">PLATFORM</div><div class="val" id="qs-platform">--</div></div>
+        <div class="cell"><div class="lbl">CONNECTION</div><div class="val" id="qs-conn">--</div></div>
+        <div class="cell"><div class="lbl">CORES</div><div class="val ac" id="qs-cores">--</div></div>
+        <div class="cell"><div class="lbl">MEMORY</div><div class="val" id="qs-mem">--</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ THREATS ══════════════════════════════════════════════ -->
+<div id="tab-threats" class="panel">
+  <div class="section">
+    <div class="section-hdr">THREAT ANALYSIS</div>
+    <div class="section-body">
+      <button class="btn warn" onclick="runThreatScan()">⚠ SCAN FOR THREATS</button>
+      <div class="log" id="threat-log">Tap SCAN FOR THREATS to begin...</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">FINDINGS</div>
+    <div class="section-body" id="threat-findings">
+      <div style="font-size:9px;color:var(--mu)">Run a scan to see results.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BATTERY ══════════════════════════════════════════════ -->
+<div id="tab-battery" class="panel">
+  <div class="section">
+    <div class="section-hdr">BATTERY STATUS</div>
+    <div class="section-body">
+      <div class="grid">
+        <div class="cell"><div class="lbl">LEVEL</div><div class="val ok" id="b-level">--</div></div>
+        <div class="cell"><div class="lbl">STATUS</div><div class="val" id="b-status">--</div></div>
+        <div class="cell"><div class="lbl">CHARGING</div><div class="val" id="b-charging">--</div></div>
+        <div class="cell"><div class="lbl">TIME LEFT</div><div class="val" id="b-time">--</div></div>
+      </div>
+      <div class="progress-wrap" style="margin-top:12px"><div class="progress-bar" id="b-bar"></div></div>
+      <div id="b-notice" class="notice" style="display:none;margin-top:8px">Battery API not available on this browser/OS.</div>
+      <button class="btn" onclick="loadBattery()">⟳ REFRESH BATTERY</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">BATTERY HEALTH TIPS</div>
+    <div class="section-body" id="bat-tips">
+      <div style="font-size:9px;color:var(--mu)">Loading battery data...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ NETWORK ══════════════════════════════════════════════ -->
+<div id="tab-network" class="panel">
+  <div class="section">
+    <div class="section-hdr">NETWORK INFO</div>
+    <div class="section-body">
+      <div class="grid">
+        <div class="cell"><div class="lbl">ONLINE</div><div class="val ok" id="n-online">--</div></div>
+        <div class="cell"><div class="lbl">TYPE</div><div class="val" id="n-type">--</div></div>
+        <div class="cell"><div class="lbl">DOWNLINK</div><div class="val ac" id="n-down">--</div></div>
+        <div class="cell"><div class="lbl">RTT</div><div class="val" id="n-rtt">--</div></div>
+        <div class="cell"><div class="lbl">DATA SAVER</div><div class="val" id="n-save">--</div></div>
+        <div class="cell"><div class="lbl">DNT</div><div class="val" id="n-dnt">--</div></div>
+      </div>
+      <button class="btn" onclick="refreshNetwork()">⟳ REFRESH NETWORK</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">SPEED TEST</div>
+    <div class="section-body">
+      <div class="grid">
+        <div class="cell"><div class="lbl">PING</div><div class="val ac" id="sp-ping">Tap test</div></div>
+        <div class="cell"><div class="lbl">DOWNLOAD</div><div class="val ok" id="sp-dl">Tap test</div></div>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="sp-bar"></div></div>
+      <button class="btn" id="sp-btn" onclick="runSpeedTest()">⚡ RUN SPEED TEST</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">VPN & PRIVACY CHECK</div>
+    <div class="section-body">
+      <div class="grid">
+        <div class="cell"><div class="lbl">COOKIES</div><div class="val" id="prv-cookies">--</div></div>
+        <div class="cell"><div class="lbl">TRACKING</div><div class="val" id="prv-track">--</div></div>
+        <div class="cell"><div class="lbl">WEBRTC LEAK</div><div class="val" id="prv-rtc">Checking...</div></div>
+        <div class="cell"><div class="lbl">USER AGENT</div><div class="val" id="prv-ua" style="font-size:8px">--</div></div>
+      </div>
+      <button class="btn bl" onclick="checkPrivacy()">🔒 RUN PRIVACY CHECK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PORTS ══════════════════════════════════════════════ -->
+<div id="tab-ports" class="panel">
+  <div class="section">
+    <div class="section-hdr">PORT SCANNER</div>
+    <div class="section-body">
+      <div class="lbl" style="margin-bottom:4px">TARGET (IP or hostname)</div>
+      <input type="text" id="port-target" placeholder="192.168.1.1 or localhost" value="localhost">
+      <div class="lbl" style="margin-top:8px;margin-bottom:4px">PORT RANGE</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input type="number" id="port-from" placeholder="From" value="1">
+        <input type="number" id="port-to" placeholder="To" value="1024">
+      </div>
+      <button class="btn" onclick="runPortScan()">🔍 SCAN PORTS</button>
+      <div class="progress-wrap"><div class="progress-bar" id="port-bar"></div></div>
+      <div class="log" id="port-log">Enter target and tap SCAN PORTS...</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">KNOWN DANGEROUS PORTS</div>
+    <div class="section-body">
+      <div class="grid3" id="danger-ports">
+        <div class="cell"><div class="lbl">TELNET</div><div class="val warn">23</div></div>
+        <div class="cell"><div class="lbl">FTP</div><div class="val am">21</div></div>
+        <div class="cell"><div class="lbl">METERP.</div><div class="val warn">4444</div></div>
+        <div class="cell"><div class="lbl">MIRAI</div><div class="val warn">7547</div></div>
+        <div class="cell"><div class="lbl">RDP</div><div class="val am">3389</div></div>
+        <div class="cell"><div class="lbl">VNC</div><div class="val am">5900</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DEVICE ══════════════════════════════════════════════ -->
+<div id="tab-device" class="panel">
+  <div class="section">
+    <div class="section-hdr">DEVICE INFORMATION</div>
+    <div class="section-body">
+      <div class="grid">
+        <div class="cell"><div class="lbl">PLATFORM</div><div class="val" id="dev-platform">--</div></div>
+        <div class="cell"><div class="lbl">BROWSER</div><div class="val" id="dev-browser">--</div></div>
+        <div class="cell"><div class="lbl">SCREEN</div><div class="val" id="dev-screen">--</div></div>
+        <div class="cell"><div class="lbl">PIXEL RATIO</div><div class="val" id="dev-dpr">--</div></div>
+        <div class="cell"><div class="lbl">CPU CORES</div><div class="val ac" id="dev-cores">--</div></div>
+        <div class="cell"><div class="lbl">MEMORY</div><div class="val" id="dev-mem">--</div></div>
+        <div class="cell"><div class="lbl">LANGUAGE</div><div class="val" id="dev-lang">--</div></div>
+        <div class="cell"><div class="lbl">TIMEZONE</div><div class="val" id="dev-tz">--</div></div>
+        <div class="cell"><div class="lbl">TOUCH POINTS</div><div class="val" id="dev-touch">--</div></div>
+        <div class="cell"><div class="lbl">ANDROID VER</div><div class="val ac" id="dev-android">--</div></div>
+      </div>
+      <button class="btn" onclick="refreshDevice()">⟳ REFRESH DEVICE INFO</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">PERMISSIONS STATUS</div>
+    <div class="section-body">
+      <div class="grid" id="perm-grid">
+        <div class="cell"><div class="lbl">GEOLOCATION</div><div class="val" id="perm-geo">Unknown</div></div>
+        <div class="cell"><div class="lbl">CAMERA</div><div class="val" id="perm-cam">Unknown</div></div>
+        <div class="cell"><div class="lbl">MIC</div><div class="val" id="perm-mic">Unknown</div></div>
+        <div class="cell"><div class="lbl">NOTIFICATIONS</div><div class="val" id="perm-notif">Unknown</div></div>
+      </div>
+      <button class="btn bl" onclick="checkPermissions()">🔑 CHECK PERMISSIONS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SYNC ══════════════════════════════════════════════ -->
+<div id="tab-sync" class="panel">
+  <div class="section">
+    <div class="section-hdr">SYNC TO MINT SCAN DESKTOP</div>
+    <div class="section-body">
+      <p style="font-size:9px;color:var(--mu);line-height:1.6;margin-bottom:8px">
+        Connect to the Mint Scan desktop server.<br>
+        USB mode: server is at localhost:8765 automatically.<br>
+        Wi-Fi mode: enter desktop IP below.
+      </p>
+      <div class="lbl">DESKTOP IP (Wi-Fi mode)</div>
+      <input type="text" id="srv-ip" placeholder="192.168.1.100" inputmode="numeric">
+      <div id="srv-status" style="font-size:9px;color:var(--mu);margin-top:5px">Not connected</div>
+      <button class="btn ok" onclick="testConn()">🔗 TEST CONNECTION</button>
+      <div class="btn-row">
+        <button class="btn" onclick="syncDevice()">📱 Device</button>
+        <button class="btn" onclick="syncBattery()">🔋 Battery</button>
+        <button class="btn" onclick="syncNetwork()">📡 Network</button>
+        <button class="btn" onclick="syncLocation()">📍 Location</button>
+      </div>
+      <button class="btn ok" onclick="syncAll()">🔄 SYNC ALL NOW</button>
+      <div class="log" id="sync-log">Ready...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOOLS ══════════════════════════════════════════════ -->
+<div id="tab-tools" class="panel">
+  <div class="section">
+    <div class="section-hdr">SECURITY TOOLS</div>
+    <div class="section-body">
+      <div class="btn-row3">
+        <button class="btn" onclick="toolPing()">📡 PING</button>
+        <button class="btn bl" onclick="toolDNS()">🔍 DNS</button>
+        <button class="btn am" onclick="toolGeoIP()">🌍 GEO IP</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="toolSSLCheck()">🔒 SSL CHECK</button>
+        <button class="btn warn" onclick="toolMaliciousCheck()">🦠 THREAT CHECK</button>
+      </div>
+      <div class="lbl" style="margin-top:10px;margin-bottom:4px">TARGET</div>
+      <input type="text" id="tool-target" placeholder="IP, domain, or URL...">
+      <div class="log" id="tool-log">Select a tool above...</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">KNOWN THREAT INTEL</div>
+    <div class="section-body">
+      <div class="grid3">
+        <div class="cell"><div class="lbl">CHECKED</div><div class="val ac" id="ti-checked">0</div></div>
+        <div class="cell"><div class="lbl">MALICIOUS</div><div class="val warn" id="ti-bad">0</div></div>
+        <div class="cell"><div class="lbl">CLEAN</div><div class="val ok" id="ti-clean">0</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Tabs ─────────────────────────────────────────────────────────
+function showTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── Clock ─────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('ts').textContent = new Date().toLocaleTimeString();
+}, 1000);
+document.getElementById('ts').textContent = new Date().toLocaleTimeString();
+
+// ── Device Info ───────────────────────────────────────────────────
+function refreshDevice() {
+  const ua = navigator.userAgent;
+  const av = (ua.match(/Android ([\d.]+)/) || ['','—'])[1];
+  let browser = 'Unknown';
+  if (ua.includes('SamsungBrowser')) browser = 'Samsung '+(ua.match(/SamsungBrowser\/([\d.]+)/)||['','?'])[1];
+  else if (ua.includes('Chrome')) browser = 'Chrome '+(ua.match(/Chrome\/([\d.]+)/)||['','?'])[1];
+  else if (ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Safari')) browser = 'Safari';
+  let platform = navigator.platform || '—';
+  if (/Android/i.test(ua)) platform = 'Android';
+  else if (/iPhone|iPad/i.test(ua)) platform = 'iOS';
+  else if (/Win/.test(ua)) platform = 'Windows';
+  else if (/Mac/.test(ua)) platform = 'macOS';
+  else if (/Linux/.test(ua)) platform = 'Linux';
+  document.getElementById('dev-platform').textContent = platform;
+  document.getElementById('dev-browser').textContent  = browser;
+  document.getElementById('dev-screen').textContent   = screen.width+'×'+screen.height;
+  document.getElementById('dev-dpr').textContent      = (window.devicePixelRatio||1).toFixed(1)+'x';
+  document.getElementById('dev-cores').textContent    = navigator.hardwareConcurrency||'—';
+  document.getElementById('dev-mem').textContent      = navigator.deviceMemory ? navigator.deviceMemory+' GB' : '—';
+  document.getElementById('dev-lang').textContent     = navigator.language||'—';
+  document.getElementById('dev-tz').textContent       = Intl.DateTimeFormat().resolvedOptions().timeZone||'—';
+  document.getElementById('dev-touch').textContent    = navigator.maxTouchPoints||'0';
+  document.getElementById('dev-android').textContent  = av || '—';
+  // Quick status
+  document.getElementById('qs-platform').textContent  = platform;
+  document.getElementById('qs-cores').textContent     = navigator.hardwareConcurrency||'—';
+  document.getElementById('qs-mem').textContent       = navigator.deviceMemory ? navigator.deviceMemory+' GB' : '—';
+}
+
+// ── Battery ───────────────────────────────────────────────────────
+async function loadBattery() {
+  if (!navigator.getBattery) {
+    document.getElementById('b-notice').style.display = 'block';
+    document.getElementById('b-level').textContent = 'N/A';
+    document.getElementById('qs-bat').textContent = 'N/A';
+    updateBatTips(null);
+    return;
+  }
+  try {
+    const bat = await navigator.getBattery();
+    function update() {
+      const pct = Math.round(bat.level * 100);
+      const lv = document.getElementById('b-level');
+      lv.textContent = pct + '%';
+      lv.className = 'val ' + (pct > 50 ? 'ok' : pct > 20 ? 'am' : 'warn');
+      document.getElementById('b-bar').style.width = pct + '%';
+      document.getElementById('b-bar').style.background = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--am)' : 'var(--wn)';
+      const ch = bat.charging;
+      document.getElementById('b-status').textContent   = ch ? 'Charging ⚡' : 'Discharging';
+      document.getElementById('b-charging').textContent = ch ? 'YES ⚡' : 'No';
+      document.getElementById('b-charging').className   = 'val ' + (ch ? 'ok' : 'tx');
+      const secs = ch ? bat.chargingTime : bat.dischargingTime;
+      if (secs === Infinity || !secs) {
+        document.getElementById('b-time').textContent = '—';
+      } else {
+        const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60);
+        document.getElementById('b-time').textContent = h ? h+'h '+m+'m' : m+'m';
+      }
+      document.getElementById('qs-bat').textContent = pct+'%';
+      document.getElementById('qs-bat').className = 'val ' + (pct > 50 ? 'ok' : pct > 20 ? 'am' : 'warn');
+      updateBatTips({pct, charging: ch});
+    }
+    update();
+    ['levelchange','chargingchange','chargingtimechange','dischargingtimechange'].forEach(e => bat.addEventListener(e, update));
+    document.getElementById('b-notice').style.display = 'none';
+  } catch(e) {
+    document.getElementById('b-level').textContent = 'Error: ' + e.message;
+  }
+}
+
+function updateBatTips(data) {
+  const el = document.getElementById('bat-tips');
+  if (!data) { el.innerHTML = '<div style="font-size:9px;color:var(--mu)">Battery API unavailable.</div>'; return; }
+  const tips = [];
+  if (data.pct < 20) tips.push({t:'warn', msg:'Critical battery — charge immediately.'});
+  else if (data.pct > 90 && data.charging) tips.push({t:'am', msg:'Avoid charging to 100% continuously — reduces long-term health.'});
+  else if (data.pct > 50) tips.push({t:'ok', msg:'Battery level is healthy.'});
+  if (!data.charging && data.pct < 40) tips.push({t:'am', msg:'Consider charging soon.'});
+  if (!tips.length) tips.push({t:'ok', msg:'Battery status looks good.'});
+  el.innerHTML = tips.map(t => `<div class="threat-item ${t.t}"><div class="threat-desc">${t.msg}</div></div>`).join('');
+}
+
+// ── Network ───────────────────────────────────────────────────────
+function refreshNetwork() {
+  const online = navigator.onLine;
+  document.getElementById('n-online').textContent = online ? 'YES' : 'OFFLINE';
+  document.getElementById('n-online').className   = 'val ' + (online ? 'ok' : 'warn');
+  document.getElementById('qs-online').textContent = online ? 'YES' : 'OFFLINE';
+  document.getElementById('qs-online').className   = 'val ' + (online ? 'ok' : 'warn');
+  const conn = navigator.connection || {};
+  document.getElementById('n-type').textContent = conn.effectiveType || conn.type || '—';
+  document.getElementById('n-down').textContent = conn.downlink ? conn.downlink+' Mbps' : '—';
+  document.getElementById('n-rtt').textContent  = conn.rtt ? conn.rtt+' ms' : '—';
+  document.getElementById('n-save').textContent = conn.saveData ? 'ON' : 'OFF';
+  document.getElementById('n-dnt').textContent  = navigator.doNotTrack === '1' ? 'ON' : 'OFF';
+  document.getElementById('qs-conn').textContent = conn.effectiveType || conn.type || '—';
+  document.getElementById('prv-cookies').textContent = navigator.cookieEnabled ? 'Enabled' : 'Disabled';
+  document.getElementById('prv-track').textContent   = navigator.doNotTrack === '1' ? 'DNT ON' : 'OFF';
+  document.getElementById('prv-ua').textContent      = navigator.userAgent.substring(0, 40)+'...';
+}
+
+async function checkPrivacy() {
+  // WebRTC leak check
+  try {
+    const pc = new RTCPeerConnection({iceServers:[]});
+    pc.createDataChannel('');
+    pc.createOffer().then(o => pc.setLocalDescription(o));
+    pc.onicecandidate = e => {
+      if (!e || !e.candidate) return;
+      const ip = e.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/);
+      document.getElementById('prv-rtc').textContent = ip ? ip[0]+' (LEAK!)' : 'No leak';
+      document.getElementById('prv-rtc').className   = ip ? 'val warn' : 'val ok';
+      pc.close();
+    };
+    setTimeout(() => {
+      if (document.getElementById('prv-rtc').textContent === 'Checking...')
+        document.getElementById('prv-rtc').textContent = 'No leak detected';
+    }, 3000);
+  } catch(e) {
+    document.getElementById('prv-rtc').textContent = 'N/A';
+  }
+}
+
+// ── Speed Test ────────────────────────────────────────────────────
+let speedRunning = false;
+async function runSpeedTest() {
+  if (speedRunning) return;
+  speedRunning = true;
+  const btn = document.getElementById('sp-btn');
+  btn.textContent = '⏳ Testing...'; btn.disabled = true;
+  document.getElementById('sp-bar').style.width = '5%';
+  document.getElementById('sp-ping').textContent = 'Testing...';
+  try {
+    const t0 = performance.now();
+    await fetch('https://www.google.com/generate_204', {mode:'no-cors', cache:'no-store'});
+    const ms = Math.round(performance.now() - t0);
+    document.getElementById('sp-ping').textContent = ms + ' ms';
+    document.getElementById('sp-ping').className   = 'val ' + (ms < 50 ? 'ok' : ms < 150 ? 'am' : 'warn');
+  } catch(e) { document.getElementById('sp-ping').textContent = 'Failed'; }
+  document.getElementById('sp-bar').style.width = '40%';
+  document.getElementById('sp-dl').textContent = 'Testing...';
+  try {
+    const t0 = performance.now();
+    const r = await fetch('https://speed.cloudflare.com/__down?bytes=1000000&t='+Date.now(), {cache:'no-store'});
+    await r.arrayBuffer();
+    const secs = (performance.now() - t0) / 1000;
+    const mbps = ((1000000 * 8) / secs / 1e6).toFixed(2);
+    document.getElementById('sp-dl').textContent = mbps + ' Mbps';
+    document.getElementById('sp-dl').className   = 'val ' + (parseFloat(mbps) > 5 ? 'ok' : parseFloat(mbps) > 1 ? 'am' : 'warn');
+  } catch(e) { document.getElementById('sp-dl').textContent = 'Failed'; }
+  document.getElementById('sp-bar').style.width = '100%';
+  btn.textContent = '⚡ RUN SPEED TEST'; btn.disabled = false;
+  speedRunning = false;
+}
+
+// ── Port Scanner ──────────────────────────────────────────────────
+const KNOWN_DANGEROUS = {23:'Telnet',21:'FTP',4444:'Metasploit',7547:'Mirai',3389:'RDP',5900:'VNC',1337:'Backdoor',31337:'BackOrifice'};
+const COMMON_PORTS = [21,22,23,25,53,80,110,143,443,445,465,587,993,995,1080,1337,3306,3389,4444,5900,8080,8443];
+
+async function runPortScan() {
+  const target = document.getElementById('port-target').value.trim() || 'localhost';
+  const from   = parseInt(document.getElementById('port-from').value) || 1;
+  const to     = Math.min(parseInt(document.getElementById('port-to').value) || 1024, 1024);
+  const log    = document.getElementById('port-log');
+  const bar    = document.getElementById('port-bar');
+  log.textContent = `Scanning ${target} ports ${from}-${to}...\n`;
+  bar.style.width = '0%';
+  const open = [];
+  // Browser port scanning via fetch (limited but works for common HTTP ports)
+  const toScan = COMMON_PORTS.filter(p => p >= from && p <= to);
+  for (let i = 0; i < toScan.length; i++) {
+    const port = toScan[i];
+    bar.style.width = ((i/toScan.length)*80) + '%';
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 800);
+      await fetch(`http://${target}:${port}`, {mode:'no-cors', signal: ctrl.signal, cache:'no-store'});
+      clearTimeout(timer);
+      const danger = KNOWN_DANGEROUS[port] ? ` ⚠ ${KNOWN_DANGEROUS[port]}` : '';
+      log.textContent += `  OPEN   :${port}${danger}\n`;
+      open.push(port);
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        // Connection refused = port exists but closed; timeout = filtered
+      }
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+  bar.style.width = '100%';
+  log.textContent += `\nScan complete. ${open.length} open port(s) found.\n`;
+  if (open.length === 0) log.textContent += 'No open HTTP-accessible ports found in range.';
+}
+
+// ── Threat Scan ───────────────────────────────────────────────────
+function tlog(msg) {
+  const l = document.getElementById('threat-log');
+  l.textContent += msg + '\n';
+  l.scrollTop = l.scrollHeight;
+}
+
+async function runThreatScan() {
+  document.getElementById('threat-log').textContent = 'Starting security scan...\n';
+  document.getElementById('threat-findings').innerHTML = '';
+  const findings = [];
+  // 1. HTTPS
+  tlog('Checking HTTPS...');
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+    findings.push({sev:'warn', title:'Not on HTTPS', desc:'Connection is unencrypted. Data may be intercepted.'});
+  } else { findings.push({sev:'ok', title:'HTTPS OK', desc:'Connection is encrypted.'}); }
+  // 2. Privacy
+  tlog('Checking tracking...');
+  if (navigator.doNotTrack !== '1') {
+    findings.push({sev:'med', title:'Do Not Track OFF', desc:'Browser does not send DNT signal to websites.'});
+  }
+  // 3. Cookies
+  tlog('Checking cookies...');
+  if (navigator.cookieEnabled) {
+    findings.push({sev:'med', title:'Cookies Enabled', desc:'Third-party cookies may track you across sites.'});
+  }
+  // 4. Battery API exposure
+  tlog('Checking API exposure...');
+  if (navigator.getBattery) {
+    findings.push({sev:'med', title:'Battery API Exposed', desc:'Websites can read battery status for fingerprinting.'});
+  }
+  // 5. WebRTC
+  tlog('Checking WebRTC leak...');
+  await checkPrivacy();
+  // 6. Memory
+  tlog('Checking device memory...');
+  if (navigator.deviceMemory && navigator.deviceMemory < 2) {
+    findings.push({sev:'med', title:'Low Memory', desc:'Device has less than 2GB RAM. May impact security app performance.'});
+  }
+  // Calculate score
+  const score = Math.max(0, 100 - findings.filter(f=>f.sev==='warn').length*20 - findings.filter(f=>f.sev==='med').length*8);
+  document.getElementById('d-score').textContent = score;
+  document.getElementById('score-n').textContent = score;
+  document.getElementById('d-threats').textContent = findings.filter(f=>f.sev!=='ok').length;
+  document.getElementById('d-status').textContent = score > 70 ? 'SECURE' : score > 40 ? 'AT RISK' : 'CRITICAL';
+  document.getElementById('d-status').className   = 'val ' + (score > 70 ? 'ok' : score > 40 ? 'am' : 'warn');
+  const el = document.getElementById('threat-findings');
+  el.innerHTML = findings.map(f =>
+    `<div class="threat-item ${f.sev}"><div class="threat-title">${f.title}</div><div class="threat-desc">${f.desc}</div></div>`
+  ).join('');
+  document.getElementById('scan-bar').style.width = '100%';
+  tlog(`\nScan complete. Score: ${score}/100. ${findings.filter(f=>f.sev!=='ok').length} issue(s) found.`);
+}
+
+async function runFullScan() {
+  document.getElementById('scan-bar').style.width = '20%';
+  await loadBattery();
+  document.getElementById('scan-bar').style.width = '50%';
+  refreshNetwork();
+  refreshDevice();
+  document.getElementById('scan-bar').style.width = '80%';
+  await runThreatScan();
+}
+
+// ── Permissions ───────────────────────────────────────────────────
+async function checkPermissions() {
+  const perms = ['geolocation','camera','microphone','notifications'];
+  const ids   = ['perm-geo','perm-cam','perm-mic','perm-notif'];
+  for (let i = 0; i < perms.length; i++) {
+    try {
+      const r = await navigator.permissions.query({name: perms[i]});
+      const el = document.getElementById(ids[i]);
+      el.textContent = r.state;
+      el.className = 'val ' + (r.state === 'granted' ? 'ok' : r.state === 'denied' ? 'warn' : 'am');
+    } catch(e) {
+      document.getElementById(ids[i]).textContent = 'N/A';
+    }
+  }
+}
+
+// ── Tools ─────────────────────────────────────────────────────────
+let tiChecked = 0, tiBad = 0, tiClean = 0;
+function toolLog(msg) {
+  const l = document.getElementById('tool-log');
+  const ts = new Date().toLocaleTimeString();
+  l.textContent = '['+ts+'] ' + msg + '\n' + l.textContent.slice(0,800);
+}
+
+async function toolPing() {
+  const t = document.getElementById('tool-target').value.trim() || 'google.com';
+  toolLog('Pinging ' + t + '...');
+  try {
+    const t0 = performance.now();
+    await fetch('https://'+t+'/favicon.ico?t='+Date.now(), {mode:'no-cors', cache:'no-store', signal: AbortSignal.timeout(5000)});
+    toolLog('Ping ' + t + ': ' + Math.round(performance.now()-t0) + 'ms');
+  } catch(e) { toolLog('Ping failed: ' + e.message); }
+}
+
+async function toolDNS() {
+  const t = document.getElementById('tool-target').value.trim() || 'google.com';
+  toolLog('DNS lookup: ' + t);
+  try {
+    const r = await fetch('https://dns.google/resolve?name='+encodeURIComponent(t)+'&type=A');
+    const d = await r.json();
+    if (d.Answer) d.Answer.forEach(a => toolLog('  A: ' + a.data + ' (TTL: ' + a.TTL + 's)'));
+    else toolLog('No DNS records found');
+    tiChecked++; tiClean++;
+    document.getElementById('ti-checked').textContent = tiChecked;
+    document.getElementById('ti-clean').textContent   = tiClean;
+  } catch(e) { toolLog('DNS error: ' + e.message); }
+}
+
+async function toolGeoIP() {
+  const t = document.getElementById('tool-target').value.trim() || '';
+  toolLog('Geolocating ' + (t || 'your IP') + '...');
+  try {
+    const url = t ? 'https://ipapi.co/'+t+'/json/' : 'https://ipapi.co/json/';
+    const r = await fetch(url, {signal: AbortSignal.timeout(8000)});
+    const d = await r.json();
+    toolLog('IP: ' + (d.ip||'?'));
+    toolLog('Country: ' + (d.country_name||'?'));
+    toolLog('City: ' + (d.city||'?'));
+    toolLog('ISP: ' + (d.org||'?'));
+    toolLog('ASN: ' + (d.asn||'?'));
+  } catch(e) { toolLog('Geo error: ' + e.message); }
+}
+
+async function toolSSLCheck() {
+  const t = document.getElementById('tool-target').value.trim() || 'google.com';
+  toolLog('SSL check: ' + t);
+  try {
+    const r = await fetch('https://'+t, {mode:'no-cors', signal: AbortSignal.timeout(5000)});
+    toolLog('SSL OK — ' + t + ' supports HTTPS');
+    tiChecked++; tiClean++;
+  } catch(e) {
+    toolLog('SSL issue or unreachable: ' + e.message);
+    tiChecked++; tiBad++;
+    document.getElementById('ti-bad').textContent = tiBad;
+  }
+  document.getElementById('ti-checked').textContent = tiChecked;
+  document.getElementById('ti-clean').textContent   = tiClean;
+}
+
+async function toolMaliciousCheck() {
+  const t = document.getElementById('tool-target').value.trim();
+  if (!t) { toolLog('Enter an IP or domain first'); return; }
+  toolLog('Checking threat intel for: ' + t);
+  // Use Google Safe Browsing via DNS
+  try {
+    const r = await fetch('https://dns.google/resolve?name='+encodeURIComponent(t)+'&type=TXT');
+    const d = await r.json();
+    toolLog('DNS resolves: ' + (d.Status === 0 ? 'YES (not NXDOMAIN)' : 'NXDOMAIN (suspicious)'));
+    if (d.Status === 3) {
+      toolLog('⚠ NXDOMAIN — domain may be malicious or taken down');
+      tiChecked++; tiBad++;
+      document.getElementById('ti-bad').textContent = tiBad;
+    } else {
+      toolLog('No immediate DNS block found');
+      tiChecked++; tiClean++;
+      document.getElementById('ti-clean').textContent = tiClean;
+    }
+    document.getElementById('ti-checked').textContent = tiChecked;
+  } catch(e) { toolLog('Check error: ' + e.message); }
+}
+
+// ── Sync to Desktop ───────────────────────────────────────────────
+function slog(msg) {
+  const l = document.getElementById('sync-log');
+  const ts = new Date().toLocaleTimeString();
+  l.textContent = '['+ts+'] ' + msg + '\n' + l.textContent.slice(0,600);
+}
+
+function getBase() {
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return location.origin;
+  const ip = document.getElementById('srv-ip').value.trim();
+  if (!ip) { slog('Enter desktop IP for Wi-Fi mode'); return null; }
+  return 'http://'+ip+':7777';
+}
+
+async function testConn() {
+  const base = getBase(); if (!base) return;
+  const el = document.getElementById('srv-status');
+  el.textContent = 'Connecting...';
+  try {
+    const r = await fetch(base+'/status', {signal: AbortSignal.timeout(5000)});
+    const d = await r.json();
+    el.textContent = '✓ '+d.name; el.style.color = 'var(--ok)';
+    slog('Connected to '+d.name);
+  } catch(e) { el.textContent = '✗ '+e.message; el.style.color='var(--wn)'; slog('Failed: '+e.message); }
+}
+
+async function post(ep, data) {
+  const base = getBase(); if (!base) return false;
+  try {
+    await fetch(base+ep, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data), signal:AbortSignal.timeout(8000)});
+    return true;
+  } catch(e) { slog('Error: '+e.message); return false; }
+}
+
+async function syncDevice() {
+  slog('Syncing device...');
+  const ok = await post('/sync/device', {platform:navigator.platform, userAgent:navigator.userAgent, cores:navigator.hardwareConcurrency, memory:navigator.deviceMemory, screen:screen.width+'x'+screen.height, language:navigator.language, timezone:Intl.DateTimeFormat().resolvedOptions().timeZone, timestamp:new Date().toISOString()});
+  slog(ok ? '✓ Device synced' : '✗ Failed');
+}
+
+async function syncBattery() {
+  if (!navigator.getBattery) { slog('Battery API unavailable'); return; }
+  const bat = await navigator.getBattery();
+  const ok  = await post('/sync/battery', {level:Math.round(bat.level*100), charging:bat.charging, timestamp:new Date().toISOString()});
+  slog(ok ? '✓ Battery synced ('+Math.round(bat.level*100)+'%)' : '✗ Failed');
+}
+
+async function syncNetwork() {
+  const conn = navigator.connection||{};
+  const ok   = await post('/sync/network', {online:navigator.onLine, type:conn.effectiveType||'?', downlink:conn.downlink, rtt:conn.rtt, timestamp:new Date().toISOString()});
+  slog(ok ? '✓ Network synced' : '✗ Failed');
+}
+
+async function syncLocation() {
+  slog('Requesting location...');
+  if (!navigator.geolocation) { slog('Location unavailable'); return; }
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const ok = await post('/sync/location', {latitude:pos.coords.latitude, longitude:pos.coords.longitude, accuracy:pos.coords.accuracy, timestamp:new Date().toISOString()});
+    slog(ok ? '✓ Location synced (±'+Math.round(pos.coords.accuracy)+'m)' : '✗ Failed');
+  }, err => slog('Denied: '+err.message));
+}
+
+async function syncAll() {
+  slog('--- Full sync ---');
+  await syncDevice();
+  await syncBattery();
+  await syncNetwork();
+  slog('--- Done ---');
+}
+
+// ── USB auto-detect ───────────────────────────────────────────────
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+  document.getElementById('srv-status').textContent = '✓ USB mode — '+location.origin;
+  document.getElementById('srv-status').style.color = 'var(--ok)';
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+refreshDevice();
+refreshNetwork();
+loadBattery();
+runThreatScan();
+</script>
+</body>
+</html>

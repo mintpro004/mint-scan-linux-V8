@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <!-- Android 16 Chrome: allow battery + geolocation on localhost -->
+    <meta http-equiv="Permissions-Policy" content="battery=*, geolocation=*">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Mint Scan Companion</title>
+    <style>
+        :root {
+            --bg:#020c14; --sf:#061523; --s2:#0a1e2e;
+            --br:#0d2a3d; --br2:#1a3a52; --ac:#00ffe0;
+            --ok:#39ff88; --wn:#ff4c4c; --am:#ffb830;
+            --bl:#4d9fff; --tx:#c8e8f4; --mu:#3a6278;
+        }
+        *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+        body{background:var(--bg);color:var(--tx);font-family:'Courier New',monospace;min-height:100vh;padding:10px;font-size:14px}
+        .header{background:var(--sf);border:1px solid var(--br);border-radius:8px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+        .logo{color:var(--ac);font-size:17px;font-weight:bold;line-height:1.3}
+        .logo-sub{font-size:9px;color:var(--mu)}
+        .live{color:var(--ok);font-size:10px;animation:blink 1.2s infinite}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+        .tabs{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto;padding-bottom:2px}
+        .tabs::-webkit-scrollbar{display:none}
+        .tab{background:var(--sf);border:1px solid var(--br);color:var(--mu);padding:8px 13px;border-radius:6px;font-size:10px;cursor:pointer;white-space:nowrap;font-family:'Courier New',monospace;flex-shrink:0}
+        .tab.active{border-color:var(--ac);color:var(--ac);background:var(--s2)}
+        .panel{display:none}.panel.active{display:block}
+        .section{background:var(--sf);border:1px solid var(--br);border-radius:8px;margin-bottom:10px;overflow:hidden}
+        .section-hdr{background:var(--s2);padding:8px 14px;font-size:9px;color:var(--ac);font-weight:bold;letter-spacing:1px;display:flex;justify-content:space-between;align-items:center}
+        .section-body{padding:12px}
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .cell{background:var(--bg);border:1px solid var(--br);border-radius:6px;padding:9px 11px}
+        .lbl{font-size:8px;color:var(--mu);margin-bottom:4px;letter-spacing:.5px}
+        .val{font-size:12px;color:var(--tx);word-break:break-all;line-height:1.3}
+        .val.ok{color:var(--ok)}.val.warn{color:var(--wn)}.val.am{color:var(--am)}.val.ac{color:var(--ac)}.val.mu{color:var(--mu)}
+        .btn{display:block;width:100%;background:transparent;border:1px solid var(--ac);color:var(--ac);padding:11px;border-radius:5px;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;cursor:pointer;margin-top:8px;text-align:center;transition:background .15s;-webkit-appearance:none}
+        .btn:active{background:var(--br2)}.btn.ok{border-color:var(--ok);color:var(--ok)}.btn.ghost{border-color:var(--mu);color:var(--mu)}.btn.warn{border-color:var(--wn);color:var(--wn)}
+        .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+        .btn-row .btn{margin-top:0}
+        .log{background:var(--bg);border:1px solid var(--br);border-radius:4px;padding:9px;font-size:9px;color:var(--ok);max-height:110px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-top:8px;line-height:1.5}
+        .progress-wrap{background:var(--br);border-radius:2px;height:5px;margin-top:8px;overflow:hidden}
+        .progress-bar{height:5px;border-radius:2px;background:var(--ac);transition:width .4s;width:0%}
+        input[type=text]{background:var(--bg);border:1px solid var(--br);color:var(--tx);font-family:'Courier New',monospace;padding:10px;border-radius:5px;width:100%;font-size:12px;margin-top:6px;-webkit-appearance:none}
+        input:focus{outline:none;border-color:var(--ac)}
+        .status-line{font-size:9px;color:var(--mu);margin-top:5px}
+        .notice{background:var(--s2);border:1px solid var(--am);border-radius:6px;padding:10px 12px;font-size:9px;color:var(--am);margin-bottom:10px;line-height:1.6}
+        .url-box{background:var(--bg);border:1px solid var(--ac);border-radius:5px;padding:11px;text-align:center;color:var(--ac);font-size:14px;font-weight:bold;margin:8px 0;letter-spacing:.5px}
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <div class="logo">[ MINT SCAN ]</div>
+        <div class="logo-sub">COMPANION v7 · MINT PROJECTS</div>
+    </div>
+    <span class="live" id="live-dot">● LIVE</span>
+</div>
+
+<div class="tabs">
+    <div class="tab active" onclick="showTab('device',this)">📱 Device</div>
+    <div class="tab" onclick="showTab('battery',this)">🔋 Battery</div>
+    <div class="tab" onclick="showTab('network',this)">📡 Network</div>
+    <div class="tab" onclick="showTab('sync',this)">🔄 Sync</div>
+    <div class="tab" onclick="showTab('connect',this)">🔗 Guide</div>
+</div>
+
+<!-- ═══ DEVICE TAB ════════════════════════════════════════════════ -->
+<div id="tab-device" class="panel active">
+    <div class="section">
+        <div class="section-hdr">DEVICE INFO <span id="ts">—</span></div>
+        <div class="section-body">
+            <div class="grid">
+                <div class="cell"><div class="lbl">STATUS</div><div class="val ok">ONLINE</div></div>
+                <div class="cell"><div class="lbl">ANDROID</div><div class="val ac" id="d-android">—</div></div>
+                <div class="cell"><div class="lbl">PLATFORM</div><div class="val" id="d-platform">—</div></div>
+                <div class="cell"><div class="lbl">BROWSER</div><div class="val" id="d-browser">—</div></div>
+                <div class="cell"><div class="lbl">CPU CORES</div><div class="val ac" id="d-cores">—</div></div>
+                <div class="cell"><div class="lbl">MEMORY</div><div class="val" id="d-mem">—</div></div>
+                <div class="cell"><div class="lbl">SCREEN</div><div class="val" id="d-screen">—</div></div>
+                <div class="cell"><div class="lbl">PIXEL RATIO</div><div class="val" id="d-dpr">—</div></div>
+                <div class="cell"><div class="lbl">LANGUAGE</div><div class="val" id="d-lang">—</div></div>
+                <div class="cell"><div class="lbl">TIMEZONE</div><div class="val" id="d-tz">—</div></div>
+                <div class="cell"><div class="lbl">TOUCH POINTS</div><div class="val" id="d-touch">—</div></div>
+                <div class="cell"><div class="lbl">COOKIES</div><div class="val" id="d-cookies">—</div></div>
+            </div>
+            <button class="btn" onclick="refreshDevice()">⟳ REFRESH</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ BATTERY TAB ══════════════════════════════════════════════ -->
+<div id="tab-battery" class="panel">
+    <div class="section">
+        <div class="section-hdr">BATTERY STATUS</div>
+        <div class="section-body">
+            <div class="grid">
+                <div class="cell"><div class="lbl">LEVEL</div><div class="val ok" id="b-level">—</div></div>
+                <div class="cell"><div class="lbl">STATUS</div><div class="val" id="b-status">—</div></div>
+                <div class="cell"><div class="lbl">CHARGING</div><div class="val" id="b-charging">—</div></div>
+                <div class="cell"><div class="lbl">TIME LEFT</div><div class="val" id="b-time">—</div></div>
+            </div>
+            <div class="progress-wrap" style="margin-top:12px">
+                <div class="progress-bar" id="b-bar"></div>
+            </div>
+            <div id="b-notice" class="notice" style="margin-top:10px;display:none">
+                ⚠ Battery API not available.<br>
+                Android 16 Chrome may require the page to be served over HTTPS for battery access. Basic device info still works.
+            </div>
+            <button class="btn" onclick="loadBattery()">⟳ REFRESH BATTERY</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ NETWORK TAB ══════════════════════════════════════════════ -->
+<div id="tab-network" class="panel">
+    <div class="section">
+        <div class="section-hdr">NETWORK</div>
+        <div class="section-body">
+            <div class="grid">
+                <div class="cell"><div class="lbl">ONLINE</div><div class="val ok" id="n-online">—</div></div>
+                <div class="cell"><div class="lbl">TYPE</div><div class="val" id="n-type">—</div></div>
+                <div class="cell"><div class="lbl">DOWNLINK</div><div class="val ac" id="n-down">—</div></div>
+                <div class="cell"><div class="lbl">RTT</div><div class="val" id="n-rtt">—</div></div>
+                <div class="cell"><div class="lbl">DATA SAVER</div><div class="val" id="n-save">—</div></div>
+                <div class="cell"><div class="lbl">DO NOT TRACK</div><div class="val" id="n-dnt">—</div></div>
+            </div>
+            <button class="btn" onclick="refreshNetwork()">⟳ REFRESH</button>
+        </div>
+    </div>
+    <div class="section">
+        <div class="section-hdr">SPEED TEST</div>
+        <div class="section-body">
+            <div class="grid">
+                <div class="cell"><div class="lbl">PING</div><div class="val ac" id="sp-ping">Tap test</div></div>
+                <div class="cell"><div class="lbl">DOWNLOAD</div><div class="val ok" id="sp-dl">Tap test</div></div>
+            </div>
+            <div class="progress-wrap"><div class="progress-bar" id="sp-bar"></div></div>
+            <button class="btn" id="sp-btn" onclick="runSpeedTest()">⚡ RUN SPEED TEST</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ SYNC TAB ═════════════════════════════════════════════════ -->
+<div id="tab-sync" class="panel">
+    <div class="section">
+        <div class="section-hdr">SEND DATA TO DESKTOP</div>
+        <div class="section-body">
+            <p style="font-size:9px;color:var(--mu);line-height:1.6;margin-bottom:8px">
+                If opened via USB (recommended): server is already at localhost.<br>
+                If via Wi-Fi: enter your desktop's IP address below.
+            </p>
+            <div class="lbl">DESKTOP IP (Wi-Fi mode only)</div>
+            <input type="text" id="srv-ip" placeholder="192.168.1.100" inputmode="numeric">
+            <div class="status-line" id="srv-status">Not tested</div>
+            <button class="btn ok" onclick="testConn()">🔗 TEST CONNECTION</button>
+            <div class="btn-row">
+                <button class="btn" onclick="syncDevice()">📱 Device</button>
+                <button class="btn" onclick="syncBattery()">🔋 Battery</button>
+                <button class="btn" onclick="syncNetwork()">📡 Network</button>
+                <button class="btn" onclick="syncLocation()">📍 Location</button>
+            </div>
+            <button class="btn ghost" onclick="syncAll()">🔄 SYNC ALL NOW</button>
+            <div class="log" id="sync-log">Ready...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ GUIDE TAB ════════════════════════════════════════════════ -->
+<div id="tab-connect" class="panel">
+    <div class="section">
+        <div class="section-hdr">HOW TO CONNECT</div>
+        <div class="section-body" style="font-size:9px;color:var(--mu);line-height:1.8">
+
+            <p style="color:var(--ac);font-weight:bold;margin-bottom:4px">METHOD 1 — USB + ADB (Best for Android 16)</p>
+            <p>1. Settings → About Phone → tap Build Number 7×</p>
+            <p>2. Settings → Developer Options → USB Debugging ON</p>
+            <p>3. Plug USB cable → Linux / Chromebook</p>
+            <p>4. Mint Scan → USB Sync → tap ↺ RESCAN</p>
+            <p>5. Tap ALLOW on phone popup</p>
+            <p>6. Tap 🚀 OPEN COMPANION ON PHONE</p>
+            <p>7. Phone opens this page at <span style="color:var(--ac)">http://localhost:8765</span></p>
+
+            <p style="color:var(--ac);font-weight:bold;margin:12px 0 4px">METHOD 2 — Wi-Fi (No cable)</p>
+            <p>1. Mint Scan → Wireless tab → START SERVER</p>
+            <p>2. Note the IP shown (e.g. 192.168.1.100:7777)</p>
+            <p>3. Phone browser → type that IP:Port</p>
+            <p>4. Use Sync tab → enter IP → TEST CONNECTION</p>
+
+            <div class="url-box" id="page-url">Loading...</div>
+            <p style="color:var(--ok);margin-top:6px">✓ Companion loaded successfully.</p>
+            <p style="color:var(--mu);margin-top:3px;font-size:8px">Android 16 · ADB port-forward · Mint Projects</p>
+            <button class="btn ok" onclick="location.reload()" style="margin-top:12px">⟳ RELOAD COMPANION</button>
+        </div>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Tab switching ─────────────────────────────────────────────────
+function showTab(name, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    el.classList.add('active');
+}
+
+// ── Clock ─────────────────────────────────────────────────────────
+function tick() {
+    const el = document.getElementById('ts');
+    if (el) el.textContent = new Date().toLocaleTimeString();
+}
+tick();
+setInterval(tick, 1000);
+
+// ── Device Info ───────────────────────────────────────────────────
+function refreshDevice() {
+    const ua = navigator.userAgent;
+
+    // Detect Android version from UA
+    const avMatch = ua.match(/Android ([\d.]+)/);
+    document.getElementById('d-android').textContent =
+        avMatch ? 'Android ' + avMatch[1] : 'Unknown';
+
+    // Browser detection
+    let browser = 'Unknown';
+    if (ua.includes('SamsungBrowser')) {
+        browser = 'Samsung ' + (ua.match(/SamsungBrowser\/([\d.]+)/) || ['','?'])[1];
+    } else if (ua.includes('Chrome')) {
+        browser = 'Chrome ' + (ua.match(/Chrome\/([\d.]+)/) || ['','?'])[1];
+    } else if (ua.includes('Firefox')) {
+        browser = 'Firefox ' + (ua.match(/Firefox\/([\d.]+)/) || ['','?'])[1];
+    } else if (ua.includes('Brave')) {
+        browser = 'Brave';
+    }
+
+    let platform = navigator.platform || '—';
+    if (/Android/i.test(ua)) platform = 'Android';
+    else if (/iPhone|iPad/i.test(ua)) platform = 'iOS';
+
+    document.getElementById('d-platform').textContent  = platform;
+    document.getElementById('d-browser').textContent   = browser;
+    document.getElementById('d-cores').textContent     = navigator.hardwareConcurrency || '—';
+    document.getElementById('d-mem').textContent       = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : '—';
+    document.getElementById('d-screen').textContent    = screen.width + '×' + screen.height;
+    document.getElementById('d-dpr').textContent       = (window.devicePixelRatio || 1).toFixed(1) + 'x';
+    document.getElementById('d-lang').textContent      = navigator.language || '—';
+    document.getElementById('d-tz').textContent        = Intl.DateTimeFormat().resolvedOptions().timeZone || '—';
+    document.getElementById('d-touch').textContent     = navigator.maxTouchPoints || '0';
+    document.getElementById('d-cookies').textContent   = navigator.cookieEnabled ? 'Enabled' : 'Disabled';
+}
+
+// ── Battery ───────────────────────────────────────────────────────
+async function loadBattery() {
+    if (!('getBattery' in navigator)) {
+        document.getElementById('b-notice').style.display = 'block';
+        document.getElementById('b-level').textContent    = 'N/A';
+        document.getElementById('b-status').textContent   = 'API unavailable';
+        return;
+    }
+    try {
+        const bat = await navigator.getBattery();
+        function update() {
+            const pct   = Math.round(bat.level * 100);
+            const lv    = document.getElementById('b-level');
+            const bar   = document.getElementById('b-bar');
+            lv.textContent  = pct + '%';
+            lv.className    = 'val ' + (pct > 50 ? 'ok' : pct > 20 ? 'am' : 'warn');
+            bar.style.width = pct + '%';
+            bar.style.background = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--am)' : 'var(--wn)';
+
+            const charging = bat.charging;
+            document.getElementById('b-charging').textContent = charging ? '⚡ YES' : 'No';
+            document.getElementById('b-charging').className   = 'val ' + (charging ? 'ok' : 'tx');
+            document.getElementById('b-status').textContent   = charging ? 'Charging' : 'Discharging';
+
+            const secs = charging ? bat.chargingTime : bat.dischargingTime;
+            if (secs === Infinity || secs === 0) {
+                document.getElementById('b-time').textContent = '—';
+            } else {
+                const h = Math.floor(secs / 3600);
+                const m = Math.floor((secs % 3600) / 60);
+                document.getElementById('b-time').textContent = h ? h+'h '+m+'m' : m+'m';
+            }
+        }
+        update();
+        bat.addEventListener('levelchange',     update);
+        bat.addEventListener('chargingchange',  update);
+        bat.addEventListener('chargingtimechange', update);
+        bat.addEventListener('dischargingtimechange', update);
+        document.getElementById('b-notice').style.display = 'none';
+    } catch(e) {
+        document.getElementById('b-notice').style.display = 'block';
+        document.getElementById('b-level').textContent    = 'Error';
+        document.getElementById('b-status').textContent   = e.message || 'Unknown error';
+    }
+}
+
+// ── Network ───────────────────────────────────────────────────────
+function refreshNetwork() {
+    const online = navigator.onLine;
+    document.getElementById('n-online').textContent = online ? 'YES' : 'OFFLINE';
+    document.getElementById('n-online').className  = 'val ' + (online ? 'ok' : 'warn');
+
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn) {
+        document.getElementById('n-type').textContent  = conn.effectiveType || conn.type || '—';
+        document.getElementById('n-down').textContent  = conn.downlink ? conn.downlink + ' Mbps' : '—';
+        document.getElementById('n-rtt').textContent   = conn.rtt ? conn.rtt + ' ms' : '—';
+        document.getElementById('n-save').textContent  = conn.saveData ? 'ON' : 'OFF';
+    } else {
+        ['n-type','n-down','n-rtt','n-save'].forEach(id =>
+            document.getElementById(id).textContent = '—');
+    }
+    document.getElementById('n-dnt').textContent = navigator.doNotTrack === '1' ? 'ON' : 'OFF';
+}
+
+// ── Speed Test ────────────────────────────────────────────────────
+let speedRunning = false;
+async function runSpeedTest() {
+    if (speedRunning) return;
+    speedRunning = true;
+    const btn  = document.getElementById('sp-btn');
+    const bar  = document.getElementById('sp-bar');
+    btn.textContent = '⏳ Testing...';
+    btn.disabled    = true;
+    bar.style.width = '5%';
+
+    // Ping
+    document.getElementById('sp-ping').textContent = 'Testing...';
+    try {
+        const t0 = performance.now();
+        await fetch('https://www.google.com/generate_204', {mode:'no-cors', cache:'no-store'});
+        const ms = Math.round(performance.now() - t0);
+        const el = document.getElementById('sp-ping');
+        el.textContent = ms + ' ms';
+        el.className   = 'val ' + (ms < 50 ? 'ok' : ms < 150 ? 'am' : 'warn');
+    } catch(e) {
+        document.getElementById('sp-ping').textContent = 'Failed';
+    }
+    bar.style.width = '45%';
+
+    // Download
+    document.getElementById('sp-dl').textContent = 'Testing...';
+    try {
+        const url = 'https://speed.cloudflare.com/__down?bytes=500000&t=' + Date.now();
+        const t0  = performance.now();
+        const r   = await fetch(url, {cache:'no-store'});
+        await r.arrayBuffer();
+        const secs = (performance.now() - t0) / 1000;
+        const mbps = ((500000 * 8) / secs / 1e6).toFixed(2);
+        const el   = document.getElementById('sp-dl');
+        el.textContent = mbps + ' Mbps';
+        el.className   = 'val ' + (parseFloat(mbps) > 5 ? 'ok' : parseFloat(mbps) > 1 ? 'am' : 'warn');
+    } catch(e) {
+        document.getElementById('sp-dl').textContent = 'Failed';
+    }
+    bar.style.width = '100%';
+    btn.textContent = '⚡ RUN SPEED TEST';
+    btn.disabled    = false;
+    speedRunning    = false;
+}
+
+// ── Sync helpers ─────────────────────────────────────────────────
+function slog(msg) {
+    const log = document.getElementById('sync-log');
+    const ts  = new Date().toLocaleTimeString();
+    log.textContent = '[' + ts + '] ' + msg + '\n' + log.textContent.slice(0, 600);
+}
+
+function getServerBase() {
+    // If served from localhost (USB mode), use localhost
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+        return location.origin;   // http://localhost:8765
+    }
+    // Wi-Fi mode — use manually entered IP
+    const ip = document.getElementById('srv-ip').value.trim();
+    if (!ip) { slog('Enter desktop IP for Wi-Fi mode'); return null; }
+    return 'http://' + ip + ':7777';
+}
+
+async function testConn() {
+    const base = getServerBase();
+    if (!base) return;
+    const el = document.getElementById('srv-status');
+    el.textContent = 'Connecting...';
+    try {
+        const r = await fetch(base + '/status', {signal: AbortSignal.timeout(5000)});
+        const d = await r.json();
+        el.textContent = '✓ Connected: ' + d.name;
+        el.style.color = 'var(--ok)';
+        slog('Connected to ' + d.name + ' v' + d.version);
+    } catch(e) {
+        el.textContent = '✗ ' + e.message;
+        el.style.color = 'var(--wn)';
+        slog('Failed: ' + e.message);
+    }
+}
+
+async function post(ep, data) {
+    const base = getServerBase();
+    if (!base) return false;
+    try {
+        await fetch(base + ep, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+            signal: AbortSignal.timeout(8000)
+        });
+        return true;
+    } catch(e) {
+        slog('Send error: ' + e.message);
+        return false;
+    }
+}
+
+async function syncDevice() {
+    slog('Syncing device...');
+    const ua = navigator.userAgent;
+    const av = (ua.match(/Android ([\d.]+)/) || ['','—'])[1];
+    const ok = await post('/sync/device', {
+        android:   av,
+        platform:  navigator.platform,
+        userAgent: ua,
+        cores:     navigator.hardwareConcurrency,
+        memory:    navigator.deviceMemory,
+        screen:    screen.width + 'x' + screen.height,
+        dpr:       window.devicePixelRatio,
+        language:  navigator.language,
+        timezone:  Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timestamp: new Date().toISOString()
+    });
+    slog(ok ? '✓ Device info sent' : '✗ Failed');
+}
+
+async function syncBattery() {
+    slog('Syncing battery...');
+    if (!navigator.getBattery) { slog('Battery API unavailable'); return; }
+    try {
+        const bat = await navigator.getBattery();
+        const ok  = await post('/sync/battery', {
+            level:          Math.round(bat.level * 100),
+            charging:       bat.charging,
+            chargingTime:   bat.chargingTime,
+            dischargingTime:bat.dischargingTime,
+            timestamp:      new Date().toISOString()
+        });
+        slog(ok ? '✓ Battery sent (' + Math.round(bat.level*100) + '%)' : '✗ Failed');
+    } catch(e) {
+        slog('Battery error: ' + e.message);
+    }
+}
+
+async function syncNetwork() {
+    slog('Syncing network...');
+    const conn = navigator.connection || {};
+    const ok   = await post('/sync/network', {
+        online:    navigator.onLine,
+        type:      conn.effectiveType || conn.type || 'unknown',
+        downlink:  conn.downlink,
+        rtt:       conn.rtt,
+        saveData:  conn.saveData,
+        timestamp: new Date().toISOString()
+    });
+    slog(ok ? '✓ Network info sent' : '✗ Failed');
+}
+
+async function syncLocation() {
+    slog('Requesting location...');
+    if (!navigator.geolocation) { slog('Geolocation unavailable'); return; }
+    navigator.geolocation.getCurrentPosition(
+        async pos => {
+            const ok = await post('/sync/location', {
+                latitude:  pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                accuracy:  pos.coords.accuracy,
+                altitude:  pos.coords.altitude,
+                timestamp: new Date().toISOString()
+            });
+            slog(ok ? '✓ Location sent (±' + Math.round(pos.coords.accuracy) + 'm)' : '✗ Failed');
+        },
+        err => slog('Location denied: ' + err.message),
+        {timeout: 10000, enableHighAccuracy: true}
+    );
+}
+
+async function syncAll() {
+    slog('--- Full sync starting ---');
+    await syncDevice();
+    await syncBattery();
+    await syncNetwork();
+    slog('--- Full sync done ---');
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+refreshDevice();
+refreshNetwork();
+loadBattery();
+
+document.getElementById('page-url').textContent = location.href;
+
+// Auto-detect USB mode: if localhost, show status
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    const el = document.getElementById('srv-status');
+    el.textContent = '✓ USB mode — server at ' + location.origin;
+    el.style.color = 'var(--ok)';
+}
+</script>
+</body>
+</html>
