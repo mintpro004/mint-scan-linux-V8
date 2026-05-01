@@ -128,7 +128,7 @@ class UsbScreen(ctk.CTkFrame):
         setup = Card(body, accent=C['bl'])
         setup.pack(fill='x', padx=14, pady=(0,8))
 
-        self.adb_status = ResultBox(setup,'ok','✓ Checking ADB...','')
+        self.adb_status = ResultBox(setup, rtype='ok', title='✓ Checking ADB...', msg='')
         self.adb_status.pack(fill='x', padx=8, pady=(8,4))
         self.install_adb_btn = Btn(setup, "⬇ INSTALL ADB",
             command=lambda: install_adb(self, on_done=lambda: threading.Thread(
@@ -320,19 +320,12 @@ class UsbScreen(ctk.CTkFrame):
         if adb_ok:
             ver, _, _ = _r("adb version 2>/dev/null | head -1")
             def _do():
-                for w in self.adb_status.winfo_children(): w.destroy()
-                ResultBox(self.adb_status.__class__.__bases__[0].__new__(
-                    ctk.CTkFrame), 'ok',
-                    f'✓ ADB Ready — {ver}', '').pack()
-                # Recreate properly
-                self.adb_status.destroy()
-                self.adb_status = ResultBox(
-                    self.adb_status.master if hasattr(self.adb_status,'master')
-                    else self.scroll._body,
-                    'ok', f'✓ ADB Ready  —  {ver[:50]}', '')
+                try:
+                    self.adb_status.configure(rtype='ok', title=f'✓ ADB Ready - {ver[:30]}', msg='')
+                except Exception:
+                    pass
                 self.install_adb_btn.pack_forget()
-            # Simpler approach
-            self._safe_after(0, lambda: self.install_adb_btn.pack_forget())
+            self._safe_after(0, _do)
         else:
             self._safe_after(0, lambda: self.install_adb_btn.pack(
                 anchor='w', padx=12, pady=(0,4)))

@@ -67,10 +67,11 @@ class AuditorScreen(ctk.CTkFrame):
         SectionHeader(body, '03', 'BINARY INTEGRITY CHECK').pack(fill='x', padx=14, pady=(10,4))
         int_card = Card(body)
         int_card.pack(fill='x', padx=14, pady=(0,8))
-        
-        self.int_res = ResultBox(int_card, 'info', 'INTEGRITY STATUS', 'No baseline found. Create one first.')
-        self.int_res.pack(fill='x', padx=8, pady=8)
         self._int_card = int_card  # store ref for later updates
+
+        # Use keywords to be absolutely sure about arguments
+        self.int_res = ResultBox(int_card, rtype='info', title='INTEGRITY STATUS', msg='No baseline found. Create one first.')
+        self.int_res.pack(fill='x', padx=8, pady=8)
         
         b_row = ctk.CTkFrame(int_card, fg_color='transparent')
         b_row.pack(fill='x', padx=8, pady=(0,8))

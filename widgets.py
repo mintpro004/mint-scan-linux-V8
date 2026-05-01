@@ -100,9 +100,10 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
                          scrollbar_button_color=sbc,
                          scrollbar_button_hover_color=sbhc,
                          corner_radius=cr, **kwargs)
-        # Linux MouseWheel support
+        # Linux / Chromebook MouseWheel support
         self.bind_all("<Button-4>", lambda e: self._on_mousewheel(e), add="+")
         self.bind_all("<Button-5>", lambda e: self._on_mousewheel(e), add="+")
+        self.bind_all("<MouseWheel>", lambda e: self._on_mousewheel(e), add="+")
 
     def _on_mousewheel(self, event):
         if not self.winfo_exists(): return
@@ -110,9 +111,9 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
         try:
             w = self.winfo_containing(event.x_root, event.y_root)
             if w and str(w).startswith(str(self)):
-                if event.num == 4:
+                if event.num == 4 or event.delta > 0:
                     self._parent_canvas.yview_scroll(-1, "units")
-                elif event.num == 5:
+                elif event.num == 5 or event.delta < 0:
                     self._parent_canvas.yview_scroll(1, "units")
         except Exception:
             pass
@@ -294,6 +295,25 @@ class ResultBox(ctk.CTkFrame):
             self._box.delete('1.0', 'end')
             self._box.configure(state='disabled')
 
+    def configure(self, **kwargs):
+        if 'rtype' in kwargs:
+            rtype = kwargs.pop('rtype')
+            col = C['ok'] if rtype == 'ok' else C['am'] if rtype in ('med', 'warn', 'warning') else C['bl'] if rtype in ('info', 'blue') else C['wn']
+            self._card.configure(border_color=col)
+            self.title_lbl.configure(text_color=col)
+            icon = '✓' if rtype == 'ok' else '⚠'
+            current_title = self.title_lbl.cget('text')
+            if current_title.startswith(('✓', '⚠')):
+                self.title_lbl.configure(text=f"{icon} {current_title[2:]}")
+        if 'title' in kwargs:
+            title = kwargs.pop('title')
+            icon = '✓' if self.title_lbl.cget('text').startswith('✓') else '⚠'
+            self.title_lbl.configure(text=f"{icon} {title}")
+        if 'msg' in kwargs:
+            msg = kwargs.pop('msg')
+            self.set(msg)
+        return super().configure(**kwargs)
+
 
 # ── LiveBadge ─────────────────────────────────────────────────────
 class LiveBadge(ctk.CTkFrame):
@@ -343,6 +363,7 @@ class Btn(ctk.CTkButton):
 
     def __init__(self, parent, text='', variant='default',
                  height=34, corner_radius=6, **kwargs):
+        self._variant = variant
         style = self.VARIANTS.get(variant, self.VARIANTS['default'])()
         style.update(kwargs)
         super().__init__(
@@ -350,3 +371,10 @@ class Btn(ctk.CTkButton):
             font=(FONT, 10, 'bold'),
             corner_radius=corner_radius,
             **style)
+
+    def configure(self, **kwargs):
+        if 'variant' in kwargs:
+            self._variant = kwargs.pop('variant')
+            style = self.VARIANTS.get(self._variant, self.VARIANTS['default'])()
+            kwargs.update(style)
+        return super().configure(**kwargs)
