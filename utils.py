@@ -29,41 +29,43 @@ def run_cmd(cmd, timeout=8):
         if is_shell and cmd.strip().startswith('sudo '):
             inner = cmd.strip()[5:].strip()
             inner_q = inner.replace("'", "'\\''")
-            # Try non-interactive sudo first, then fall back
-            cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || sudo bash -c '{inner_q}'"
+            # In Crostini/Chromebook, sudo -n often works. On others, it might fail.
+            # We try to use sudo -n only if we've already confirmed it works elsewhere or just try it.
+            cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || bash -c '{inner_q}'"
         elif not is_shell and cmd[0] == 'sudo':
-            # For lists, we ensure -n is present if not already
-            if '-n' not in cmd:
-                cmd.insert(1, '-n')
+            # For lists, we try with -n but handle failure
+            pass
 
     run_env = {**os.environ,
                'DEBIAN_FRONTEND': 'noninteractive',
                'SUDO_ASKPASS': '/bin/false'}
 
     try:
+        # If we use a list and sudo, and we aren't root, try -n
+        actual_cmd = cmd
+        if not is_shell and cmd[0] == 'sudo' and os.getuid() != 0:
+             # Try with -n first
+             try:
+                 r = subprocess.run(['sudo', '-n'] + cmd[1:], capture_output=True, text=True, timeout=timeout, env=run_env)
+                 if r.returncode == 0:
+                     return r.stdout.strip(), r.stderr.strip(), 0
+             except:
+                 pass
+             # Fallback to no sudo or just fail silently if sudo required
+             actual_cmd = cmd[1:]
+
         r = subprocess.run(
-            cmd, shell=is_shell, capture_output=True,
+            actual_cmd, shell=is_shell, capture_output=True,
             text=True, timeout=timeout, env=run_env)
         
         stdout = r.stdout.strip() if r.stdout else ""
         stderr = r.stderr.strip() if r.stderr else ""
         
-        if r.returncode != 0 and stderr:
-            _log.debug(f'cmd [{r.returncode}]: {stderr[:120]}')
         return stdout, stderr, r.returncode
 
     except subprocess.TimeoutExpired:
         _log.warning(f'Timeout ({timeout}s): {original_cmd[:80]}')
         return '', f'timeout after {timeout}s', 1
-
-    except FileNotFoundError as e:
-        _log.error(f'Not found: {e}')
-        return '', str(e), 127
-
-    except PermissionError as e:
-        _log.error(f'Permission denied: {e}')
-        return '', str(e), 126
-
     except Exception as e:
         _log.error(f'run_cmd error: {e}')
         return '', str(e), 1

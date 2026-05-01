@@ -95,15 +95,29 @@ def detect_vpn_tools() -> dict:
 def get_vpn_status() -> dict:
     active_wg, _, _ = run_cmd('wg show interfaces 2>/dev/null', timeout=4)
     tun_out, _, _   = run_cmd('ip link show type tun 2>/dev/null', timeout=4)
+    # Also check for ppp or other common VPN interfaces
+    ppp_out, _, _   = run_cmd('ip link show type ppp 2>/dev/null', timeout=4)
     nm_active, _, _ = run_cmd(
         "nmcli -t -f NAME,TYPE,STATE con show --active 2>/dev/null | grep -i vpn | grep -i activated",
         timeout=4)
+    
+    ifaces = []
+    if active_wg.strip(): ifaces.extend(active_wg.strip().split())
+    if tun_out.strip(): 
+        t_m = re.findall(r'\d+: (tun\d+):', tun_out)
+        if t_m: ifaces.extend(t_m)
+    if ppp_out.strip():
+        p_m = re.findall(r'\d+: (ppp\d+):', ppp_out)
+        if p_m: ifaces.extend(p_m)
+
     return {
         'wireguard_active':  bool(active_wg.strip()),
         'wireguard_ifaces':  active_wg.strip().split() if active_wg.strip() else [],
         'tun_active':        bool(tun_out.strip()),
+        'ppp_active':        bool(ppp_out.strip()),
         'nm_vpn_active':     bool(nm_active.strip()),
         'nm_vpn_name':       nm_active.split(':')[0].strip() if nm_active.strip() else '',
+        'all_ifaces':        sorted(list(set(ifaces))),
     }
 
 
@@ -286,46 +300,12 @@ class VPNScreen(ctk.CTkFrame):
             if not self.winfo_exists(): return
         except Exception: return
 
-        # On Chromebook: show a helpful notice if nothing found
-        if _is_crostini() and not wg_cfgs and not ov_cfgs and not nm_conns:
-            self._ulog('ℹ  Chromebook detected — VPN setup notes:')
-            self._ulog('   WireGuard: place .conf files in ~/vpn/ then click ↺ REFRESH')
-            self._ulog('   OpenVPN: place .ovpn files in ~/vpn/ then click ↺ REFRESH')
-            self._ulog('   Chrome OS built-in VPN: use Chrome OS Settings → Network → VPN')
-            self._ulog('   (Chrome OS VPN is not accessible from the Linux container)')
-
-        # WireGuard dropdown
-        wg_vals = wg_cfgs if wg_cfgs else [NONE_LABEL]
-        self._wg_menu.configure(values=wg_vals)
-        if wg_cfgs and self._wg_var.get() == NONE_LABEL:
-            self._wg_var.set(wg_cfgs[0])
-        elif not wg_cfgs:
-            self._wg_var.set(NONE_LABEL)
-
-        # OpenVPN dropdown
-        ov_vals = ov_cfgs if ov_cfgs else [NONE_LABEL]
-        self._ov_menu.configure(values=ov_vals)
-        if ov_cfgs and self._ov_var.get() == NONE_LABEL:
-            self._ov_var.set(ov_cfgs[0])
-        elif not ov_cfgs:
-            self._ov_var.set(NONE_LABEL)
-
-        # NM VPN dropdown
-        nm_vals = nm_conns if nm_conns else [NONE_LABEL]
-        self._nm_menu.configure(values=nm_vals)
-        if nm_conns and self._nm_var.get() == NONE_LABEL:
-            self._nm_var.set(nm_conns[0])
-        elif not nm_conns:
-            self._nm_var.set(NONE_LABEL)
-
         # Status
-        connected = st['wireguard_active'] or st['tun_active'] or st['nm_vpn_active']
-        if st['wireguard_active']:
-            detail = f"WireGuard: {', '.join(st['wireguard_ifaces'])}"
-        elif st['nm_vpn_active']:
-            detail = f"NM VPN: {st['nm_vpn_name']}"
-        elif st['tun_active']:
-            detail = "TUN interface active (OpenVPN)"
+        connected = st['wireguard_active'] or st['tun_active'] or st['nm_vpn_active'] or st['ppp_active']
+        if st['all_ifaces']:
+            detail = f"Active Interfaces: {', '.join(st['all_ifaces'])}"
+            if st['nm_vpn_name']:
+                detail += f" ({st['nm_vpn_name']})"
         else:
             detail = f"WG configs: {len(wg_cfgs)}  OVPN: {len(ov_cfgs)}  NM VPNs: {len(nm_conns)}"
 
@@ -334,6 +314,15 @@ class VPNScreen(ctk.CTkFrame):
             text_color=C['ok'] if connected else C['wn'])
         self._stat_info.configure(text=detail)
 
+        # Previously connected networks (NM connection history)
+        from utils import get_saved_wifi_networks
+        saved = get_saved_wifi_networks()
+        if saved:
+            self._ulog(f"Detected {len(saved)} saved network profile(s).")
+            for s in saved[:5]:
+                self._ulog(f"  • {s['name']} (Last: {s['last']})")
+        
+        # Tool status
         tool_parts = []
         for name, ok in tools.items():
             tool_parts.append(f"{'✓' if ok else '✗'} {name}")

@@ -22,9 +22,17 @@ BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 
 def _parse_ver(s):
     """Parse 'v8.1.2' or '8.1.2' → (8,1,2)."""
+    if not s: return (0, 0, 0)
     s = s.lstrip('vV').strip()
     try:
-        parts = [int(x) for x in s.split('.')]
+        parts = []
+        for x in s.split('.'):
+            # Extract digits only
+            m = re.match(r'(\d+)', x)
+            if m:
+                parts.append(int(m.group(1)))
+            else:
+                parts.append(0)
         while len(parts) < 3:
             parts.append(0)
         return tuple(parts[:3])

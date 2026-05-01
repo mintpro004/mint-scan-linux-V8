@@ -372,9 +372,20 @@ class DashScreen(ctk.CTkFrame):
     def _fetch(self):
         from concurrent.futures import ThreadPoolExecutor
         def _get_cpu():
-            out, _, _ = run_cmd("top -bn1 | grep 'Cpu(s)' | awk '{print $2}'")
-            try: return float(out.strip().replace('%','').replace(',','.') or 0)
-            except: return 0.0
+            # Try /proc/stat first for instant non-blocking read
+            try:
+                with open('/proc/stat') as f:
+                    v1 = list(map(int, f.readline().split()[1:]))
+                time.sleep(0.2)
+                with open('/proc/stat') as f:
+                    v2 = list(map(int, f.readline().split()[1:]))
+                idle = v2[3] - v1[3]
+                total = sum(v2) - sum(v1)
+                return 100.0 * (1 - idle/total) if total > 0 else 0.0
+            except:
+                out, _, _ = run_cmd("top -bn1 | grep 'Cpu(s)' | awk '{print $2}'")
+                try: return float(out.strip().replace('%','').replace(',','.') or 0)
+                except: return 0.0
         def _get_mem():
             out, _, _ = run_cmd("free | grep Mem | awk '{printf \"%.0f\", $3/$2*100}'")
             try: return int(out.strip() or 0)
@@ -383,9 +394,11 @@ class DashScreen(ctk.CTkFrame):
             out, _, _ = run_cmd("ufw status 2>/dev/null | head -1")
             return 'active' in out.lower()
         def _get_pkgs():
+            # apt list is slow, try a faster check if possible
             out, _, _ = run_cmd("apt list --upgradeable 2>/dev/null | wc -l")
-            try: return max(0, int(out.strip()) - 1)
+            try: return max(0, int(out.strip() or 0) - 1)
             except: return 0
+        
         with ThreadPoolExecutor(max_workers=10) as ex:
             f_sys    = ex.submit(get_system_info)
             f_bat    = ex.submit(get_battery_info)
@@ -397,23 +410,25 @@ class DashScreen(ctk.CTkFrame):
             f_mem    = ex.submit(_get_mem)
             f_ufw    = ex.submit(_get_ufw)
             f_pkgs   = ex.submit(_get_pkgs)
-        sysinfo  = f_sys.result()
+            
+        sysinfo  = f_sys.result() or {}
         bat      = f_bat.result()
-        local_ip = f_lip.result()
-        ipinfo   = f_ipinfo.result()
-        ports    = f_ports.result()
-        procs    = f_procs.result()
+        local_ip = f_lip.result() or '—'
+        ipinfo   = f_ipinfo.result() or {}
+        ports    = f_ports.result() or []
+        procs    = f_procs.result() or []
         cpu      = f_cpu.result()
         mem_pct  = f_mem.result()
         fw_ok    = f_ufw.result()
         pkg_n    = f_pkgs.result()
+
         def _safe_render():
             try:
                 if self.winfo_exists():
                     self._render(sysinfo, bat, local_ip, ipinfo, ports, procs,
                                  cpu, mem_pct, fw_ok, pkg_n)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Render error: {e}")
         self.after(0, _safe_render)
 
     def _render(self, sysinfo, bat, local_ip, ipinfo, ports, procs,
