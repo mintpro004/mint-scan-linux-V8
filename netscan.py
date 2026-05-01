@@ -187,8 +187,16 @@ class NetScanScreen(ctk.CTkFrame):
 
     def _do_scan(self):
         # Get local subnet
+        from utils import _is_crostini
+        is_cros = _is_crostini()
+        
         ip_out, _, _ = run("ip route | grep -v default | head -1 | awk '{print $1}'")
         subnet = ip_out.strip() or '192.168.1.0/24'
+        
+        if is_cros:
+            self._safe_after(0, lambda: self._log_traffic(
+                "ℹ Chromebook detected. Scanning external LAN is restricted in Crostini.\n"
+                "Only devices on the internal bridge may be visible."))
 
         # Try nmap first, fallback to arp
         nmap_out, _, nmap_rc = run(f"nmap -sn {subnet} 2>/dev/null", timeout=30)
@@ -295,6 +303,7 @@ class NetScanScreen(ctk.CTkFrame):
             cmd = "sudo tcpdump -l -n -q -c 100 2>/dev/null"
         else:
             cmd = "ss -tnp 2>/dev/null"
+            self._safe_after(0, lambda: self._log_traffic("ℹ tcpdump not found. Displaying active connections via 'ss' instead."))
 
         try:
             self._cap_proc = subprocess.Popen(

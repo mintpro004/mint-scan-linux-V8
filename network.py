@@ -729,16 +729,27 @@ class NetworkScreen(ctk.CTkFrame):
     def _do_capture(self):
         import subprocess
         tcpdump = run_cmd(['which', 'tcpdump'])[0].strip()
-        cmd = (f'sudo {tcpdump} -l -n -q -c 500 2>/dev/null'
-               if tcpdump else 'ss -tnp 2>/dev/null')
+        if tcpdump:
+            self.after(0, lambda: self._tlog_line("ℹ Starting packet capture via tcpdump..."))
+            cmd = f'sudo {tcpdump} -l -n -q -c 500 2>/dev/null'
+        else:
+            self.after(0, lambda: self._tlog_line("ℹ tcpdump not found. Monitoring active connections via 'ss' instead."))
+            cmd = 'ss -tnp 2>/dev/null'
+
         try:
             self._traffic_proc = subprocess.Popen(
                 cmd, shell=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True)
+            
+            count = 0
             for line in self._traffic_proc.stdout:
                 if not self._traffic_running:
                     break
                 self.after(0, self._tlog_line, line.rstrip())
+                count += 1
+            
+            if count == 0:
+                self.after(0, lambda: self._tlog_line("⚠ No traffic captured. Check your network permissions or interface."))
         except Exception as e:
             self.after(0, self._tlog_line, f'Capture error: {e}')
         finally:

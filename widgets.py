@@ -120,78 +120,25 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
 
 
 # ── Card ──────────────────────────────────────────────────────────
-#
-# CRASH HISTORY & FIX:
-#
-# Crash 1 (older ctk):  AttributeError: property '_w' of 'Card' has no setter
-#   Cause: called super().pack() INSIDE __init__ before tkinter finished init.
-#   Fix:   NEVER call pack/grid/place inside __init__. Callers do that.
-#
-# Crash 2 (Python 3.11 + ctk 5.2): TypeError: method + str
-#   Cause: previous "fix" made Card a plain object with def _w(self) as a
-#          regular method. tkinter does master._w + '.' which fails on a method.
-#   Fix:   Card MUST be a CTkFrame subclass so _w is set correctly by
-#          tkinter.Frame.__init__. Just never call super().pack() in __init__.
-#
-# RULE: CTkFrame subclasses are fine. The only forbidden pattern is
-#       calling pack/grid/place on self INSIDE __init__.
-
 class Card(ctk.CTkFrame):
     """
     Raised card with 3D bevel highlight border.
-    Usage: card = Card(parent); card.pack(fill='x', padx=14)
-    Children pack directly into card: ctk.CTkLabel(card, ...).pack()
-
-    Safe on ALL customtkinter 5.x versions, Python 3.9-3.12, x86_64+aarch64.
+    Simplified implementation for maximum compatibility with all screens.
     """
     def __init__(self, parent, accent=None, **kwargs):
         fg = kwargs.pop('fg_color', C['sf'])
         cr = kwargs.pop('corner_radius', 10)
-        # Drop unsupported kwargs silently
+        # Drop unsupported kwargs
         kwargs.pop('border_color', None)
         kwargs.pop('border_width', None)
 
-        # Initialise the CTkFrame (sets self._w correctly via tkinter)
-        # DO NOT call self.pack() here — the caller does that.
-        super().__init__(parent, fg_color=C['brd'],
-                         corner_radius=cr + 2, border_width=0)
-
-        # Highlight ring (child of self — safe because self is fully init'd)
-        hl_color = accent if accent else C['brt']
-        self._hl = ctk.CTkFrame(self, fg_color=hl_color,
-                                 corner_radius=cr + 1, border_width=0)
-        self._hl.pack(fill='both', expand=True, padx=(1, 0), pady=(1, 0))
-
-        if accent:
-            ctk.CTkFrame(self._hl, height=2, fg_color=accent, corner_radius=0).pack(fill='x', side='top')
-
-        # Content surface — the actual fg colour shown to user
-        self._inner = ctk.CTkFrame(self._hl, fg_color=fg,
-                                    corner_radius=cr, border_width=0)
-        self._inner.pack(fill='both', expand=True, padx=(0, 1), pady=(0, 1))
-
-    # ── Child widget creation ─────────────────────────────────────
-    # When code does: ctk.CTkLabel(card, text='...').pack()
-    # tkinter calls card._nametowidget and card._w to build the widget path.
-    # Since Card is a real CTkFrame, these all work correctly.
-    #
-    # HOWEVER: we want children to visually appear inside self._inner
-    # (the coloured surface), not inside self (the dark shadow border).
-    # We override the tkinter internal registration so child widgets
-    # get self._inner as their real tk parent.
-
-    def _configure_children_parent(self):
-        """Return self._inner so child widgets render on the content surface."""
-        return self._inner
-
-    # Standard geometry — Card itself is placed by the caller
-    def winfo_children(self):
-        return self._inner.winfo_children()
+        # Use border to simulate the bevel
+        super().__init__(parent, fg_color=fg, corner_radius=cr,
+                         border_width=1, border_color=accent or C['brt'], **kwargs)
 
     @property
     def interior(self):
-        """Explicit access to the content surface for complex layouts."""
-        return self._inner
+        return self
 
 
 # ── SectionHeader ─────────────────────────────────────────────────

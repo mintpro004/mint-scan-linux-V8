@@ -3,49 +3,27 @@ Mint Scan v8 — Plugin System
 Load custom security modules from ~/.mint_scan_plugins/
 Each plugin is a Python file exposing:
   PLUGIN_META = {'name':'...', 'version':'1.0', 'author':'...', 'description':'...'}
-  class PluginScreen(ctk.CTkFrame): ...   (optional — adds a tab)
-  def on_event(event, data): ...         (optional — receives app events)
+  class PluginScreen(ctk.CTkFrame): ...
 """
-import os, sys, importlib.util, traceback, json
+import os, sys, importlib.util, threading, time, traceback
+import customtkinter as ctk
+import tkinter as tk
+from widgets import C, MONO, MONO_SM, ScrollableFrame, Card, SectionHeader, Btn, ResultBox
 from logger import get_logger
 
 log = get_logger('plugins')
 
-PLUGIN_DIR  = os.path.expanduser('~/.mint_scan_plugins')
-_loaded     = {}   # name → module
-
-
-def ensure_dir():
+PLUGIN_DIR = os.path.expanduser('~/.mint_scan_plugins/')
+if not os.path.exists(PLUGIN_DIR):
     os.makedirs(PLUGIN_DIR, exist_ok=True)
-    readme = os.path.join(PLUGIN_DIR, 'README.txt')
-    if not os.path.exists(readme):
-        with open(readme, 'w') as f:
-            f.write("""MINT SCAN v8 — PLUGIN DIRECTORY
-=================================
-Drop .py files here to add custom modules.
 
-Each plugin must contain:
-  PLUGIN_META = {
-      'name':        'My Plugin',
-      'version':     '1.0',
-      'author':      'Your Name',
-      'description': 'What it does',
-  }
-
-Optional:
-  class PluginScreen(ctk.CTkFrame):  # adds a sidebar tab
-      def __init__(self, parent, app): ...
-      def on_focus(self): ...
-
-  def on_event(event, data): ...     # receives 'threat_found', 'scan_complete' etc.
-
-Example plugins: https://github.com/mintpro004/mint-scan-linux-V8/tree/main/plugins
-""")
+_loaded = {}  # name -> module
 
 
 def discover():
-    """Scan PLUGIN_DIR for .py files. Returns list of paths."""
-    ensure_dir()
+    """Return list of .py filenames in PLUGIN_DIR."""
+    if not os.path.exists(PLUGIN_DIR):
+        return []
     return sorted(
         f for f in os.listdir(PLUGIN_DIR)
         if f.endswith('.py') and not f.startswith('_'))
@@ -108,10 +86,6 @@ def get_loaded() -> dict:
 
 
 # ── Plugin Manager Screen ─────────────────────────────────────────
-import tkinter as tk
-import customtkinter as ctk
-from widgets import C, MONO, MONO_SM, ScrollableFrame, Card, SectionHeader, Btn, ResultBox
-
 
 class PluginScreen(ctk.CTkFrame):
     def __init__(self, parent, app):
@@ -141,59 +115,65 @@ class PluginScreen(ctk.CTkFrame):
             command=lambda: os.system(f'xdg-open "{PLUGIN_DIR}" &'),
             variant='ghost', width=130).pack(side='right', padx=4, pady=6)
 
-        body = ScrollableFrame(self)
-        body.pack(fill='both', expand=True)
-        self._body = body
-
-        SectionHeader(body, '01', 'PLUGIN DIRECTORY').pack(
-            fill='x', padx=14, pady=(14, 4))
-        dc = Card(body)
-        dc.pack(fill='x', padx=14, pady=(0, 8))
-        ctk.CTkLabel(dc, text=PLUGIN_DIR,
-                     font=('DejaVu Sans Mono', 9), text_color=C['ac']
-                     ).pack(anchor='w', padx=12, pady=8)
-        ctk.CTkLabel(dc,
-            text='Drop .py plugin files here. Each plugin can add a sidebar tab\n'
-                 'or react to security events (threats, scans, port opens).',
-            font=('DejaVu Sans Mono', 9), text_color=C['mu'], justify='left'
-            ).pack(anchor='w', padx=12, pady=(0, 10))
-
-        SectionHeader(body, '02', 'INSTALLED PLUGINS').pack(
-            fill='x', padx=14, pady=(8, 4))
-        self._list_frame = ctk.CTkFrame(body, fg_color='transparent')
-        self._list_frame.pack(fill='x', padx=14, pady=(0, 14))
+        self.scroll = ScrollableFrame(self)
+        self.scroll.pack(fill='both', expand=True)
 
     def _refresh(self):
-        for w in self._list_frame.winfo_children():
-            w.destroy()
+        for w in self.scroll.winfo_children(): w.destroy()
+        body = self.scroll
+
+        # ── CORE MODULES ──────────────────────────────────────
+        SectionHeader(body, '01', 'CORE SECURITY MODULES').pack(fill='x', padx=14, pady=(14,4))
+        core_card = Card(body)
+        core_card.pack(fill='x', padx=14, pady=(0,8))
+        
+        from app import ALL_TABS
+        tab_map = {k: (lbl, icon) for k, lbl, icon in ALL_TABS}
+        
+        grid = ctk.CTkFrame(core_card, fg_color='transparent')
+        grid.pack(fill='x', padx=12, pady=12)
+        
+        core_keys = ['malware', 'network', 'firewall', 'guardian', 'ids', 'auditor', 'vpn']
+        for i, key in enumerate(core_keys):
+            lbl, icon = tab_map.get(key, (key.upper(), '🛠'))
+            r_idx, c_idx = divmod(i, 2)
+            f = ctk.CTkFrame(grid, fg_color=C['s2'], corner_radius=6)
+            f.grid(row=r_idx, column=c_idx, padx=4, pady=4, sticky='ew')
+            ctk.CTkLabel(f, text=f"{icon} {lbl}", font=MONO, text_color=C['ac']).pack(side='left', padx=10, pady=8)
+            ctk.CTkLabel(f, text="INSTALLED", font=('DejaVu Sans Mono', 8, 'bold'), text_color=C['ok']).pack(side='right', padx=10)
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
+
+        # ── EXTERNAL PLUGINS ──────────────────────────────────
+        SectionHeader(body, '02', 'EXTERNAL PLUGINS').pack(fill='x', padx=14, pady=(10,4))
+        ext_card = Card(body)
+        ext_card.pack(fill='x', padx=14, pady=(0,8))
+        
         results = load_all()
         if not results:
-            ctk.CTkLabel(self._list_frame,
-                text='No plugins found.\nDrop .py files into: ' + PLUGIN_DIR,
-                font=MONO_SM, text_color=C['mu']
-                ).pack(pady=12)
-            return
-        for r in results:
-            m   = r['meta']
-            err = r['error']
-            row = ctk.CTkFrame(
-                self._list_frame, fg_color=C['sf'],
-                border_color=C['ok'] if not err else C['wn'],
-                border_width=1, corner_radius=6)
-            row.pack(fill='x', pady=3)
-            lc = ctk.CTkFrame(row, fg_color='transparent')
-            lc.pack(fill='x', padx=10, pady=8)
-            ctk.CTkLabel(lc,
-                text=f"{'✓' if not err else '✗'}  {m.get('name','?')}  v{m.get('version','?')}",
-                font=('DejaVu Sans Mono', 10, 'bold'),
-                text_color=C['ok'] if not err else C['wn']
-                ).pack(side='left')
-            ctk.CTkLabel(lc,
-                text=f"  by {m.get('author','?')}",
-                font=('DejaVu Sans Mono', 8), text_color=C['mu']
-                ).pack(side='left')
-            ctk.CTkLabel(row,
-                text=m.get('description', err or ''),
-                font=('DejaVu Sans Mono', 9), text_color=C['mu']
-                ).pack(anchor='w', padx=10, pady=(0, 8))
+            ctk.CTkLabel(ext_card, text="No external plugins found in ~/.mint_scan_plugins/",
+                         font=MONO_SM, text_color=C['mu']).pack(pady=20)
+        else:
+            for res in results:
+                m = res.get('meta', {})
+                ok = res.get('error') is None
+                self._render_plugin_row(ext_card, m, ok, res.get('error'))
 
+    def _render_plugin_row(self, parent, m, ok, err=None):
+        row = ctk.CTkFrame(parent, fg_color=C['s2'], corner_radius=6)
+        row.pack(fill='x', padx=10, pady=4)
+        title_r = ctk.CTkFrame(row, fg_color='transparent')
+        title_r.pack(fill='x', padx=10, pady=(8,2))
+        ctk.CTkLabel(title_r, text=m.get('name','Unknown'), font=MONO,
+                     text_color=C['ac'] if ok else C['wn']).pack(side='left')
+        ctk.CTkLabel(title_r, text=f"v{m.get('version','1.0')}", font=('DejaVu Sans Mono', 8),
+                     text_color=C['mu']).pack(side='left', padx=10)
+        ctk.CTkLabel(title_r, text="● ACTIVE" if ok else "● ERROR",
+                     font=('DejaVu Sans Mono', 8, 'bold'),
+                     text_color=C['ok'] if ok else C['wn']
+                     ).pack(side='right')
+        ctk.CTkLabel(row,
+            text=m.get('description', err or ''),
+            font=('DejaVu Sans Mono', 9), text_color=C['mu'],
+            wraplength=600, justify='left'
+            ).pack(anchor='w', padx=10, pady=(0, 8))

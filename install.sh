@@ -65,9 +65,10 @@ if $IS_CHROMEBOOK; then
     sudo apt-get update -qq 2>/dev/null || true
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
         $PKGS_BASE $PKGS_NET 2>/dev/null || true
-    # Chromebook UFW fix — needs special flag
+    # Chromebook UFW fix
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ufw 2>/dev/null && \
-        echo "  ✓ UFW installed successfully on Chromebook"
+        (sudo ufw --force enable 2>/dev/null || true) && \
+        echo "  ✓ UFW installed and enabled on Chromebook"
 
 elif $IS_AARCH64; then
     echo "  ARM64 / aarch64: using compatible package list..."

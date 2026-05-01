@@ -438,8 +438,17 @@ class DashScreen(ctk.CTkFrame):
         danger_ports = {'23','4444','5555','1337','31337','7547'}
         risky_ports  = set(str(p['port']) for p in ports if str(p['port']) in danger_ports)
         score -= len(risky_ports) * 15
+        
+        # Check firewall
+        if not fw_ok: score -= 20
+        
+        # Check updates
+        if pkg_n > 20: score -= 10
+        elif pkg_n > 0: score -= 5
+        
         if bat and bat.get('health','').lower() not in ('good','unknown','—',''):
             score -= 10
+        
         score = max(0, min(100, score))
         col = C['ok'] if score >= 75 else C['am'] if score >= 50 else C['wn']
 
@@ -452,15 +461,16 @@ class DashScreen(ctk.CTkFrame):
         self._pulse.set_color(col)
 
         # ── Stat cards (all values pre-fetched in background) ─
-        bat_pct = bat['level'] if bat and bat.get('level') else 0
+        bat_pct = bat['level'] if bat and bat.get('level') is not None else 0
 
         self._card_cpu.update(f'{cpu:.0f}%', 'user+sys', push_chart=cpu)
-        self._card_mem.update(f'{mem_pct}%', sysinfo.get('ram_total','—'), push_chart=mem_pct)
+        self._card_mem.update(f'{mem_pct}%', sysinfo.get('ram_total','N/A'), push_chart=mem_pct)
         self._card_bat.update(
             f"{bat_pct}%" if bat else 'AC',
-            bat.get('status','—') if bat else 'Desktop',
+            bat.get('status','N/A') if bat else 'Desktop',
             push_chart=bat_pct)
-        self._card_net.update(local_ip, ipinfo.get('city','—'), push_chart=None)
+        self._card_net.update(local_ip if local_ip != '—' else 'Detecting...', 
+                               ipinfo.get('city','N/A'), push_chart=None)
 
         # ── Threat status (pre-fetched) ───────────────────────
         self._threat_cards['firewall'].configure(
@@ -504,7 +514,7 @@ class DashScreen(ctk.CTkFrame):
         # ── Net grid ──────────────────────────────────────────
         for w in self._net_frame.winfo_children(): w.destroy()
         net_data = [
-            ('LOCAL IP',  local_ip if local_ip else 'N/A',                    C['am']),
+            ('LOCAL IP',  local_ip if local_ip != '—' else 'N/A',                    C['am']),
             ('PUBLIC IP', ipinfo.get('ip','Detecting...'),         C['wn']),
             ('ISP',       ipinfo.get('org','N/A')),
             ('COUNTRY',   ipinfo.get('country_name','N/A')),
@@ -521,18 +531,20 @@ class DashScreen(ctk.CTkFrame):
         if bat:
             bat_col = C['ok'] if int(bat.get('level', 50) or 50) > 20 else C['wn']
             InfoGrid(self._bat_frame, [
-                ('LEVEL',   f"{bat['level']}%" if bat.get('level') else '—', bat_col),
-                ('STATUS',  bat.get('status','—')),
-                ('HEALTH',  bat.get('health','—')),
-                ('TECH',    bat.get('tech','—')),
-                ('VOLTAGE', bat.get('voltage','—')),
-                ('CURRENT', bat.get('current','—')),
-                ('CYCLES',  str(bat.get('cycles','—'))),
+                ('LEVEL',   f"{bat['level']}%" if bat.get('level') is not None else 'N/A', bat_col),
+                ('STATUS',  bat.get('status','N/A')),
+                ('HEALTH',  bat.get('health','N/A')),
+                ('TECH',    bat.get('tech','N/A')),
+                ('VOLTAGE', bat.get('voltage','N/A')),
+                ('CURRENT', bat.get('current','N/A')),
+                ('CYCLES',  str(bat.get('cycles','N/A'))),
             ], columns=3).pack(fill='x')
         else:
-            ResultBox(self._bat_frame, 'info',
-                      'ℹ No battery detected',
-                      'Running on AC power or desktop system.').pack(fill='x')
+            msg = 'Running on AC power or desktop system.'
+            from utils import _is_crostini
+            if _is_crostini():
+                msg += '\nNote: Chromebook Linux containers may not see battery info.'
+            ResultBox(self._bat_frame, rtype='info', title='ℹ No battery detected', msg=msg).pack(fill='x')
 
         # ── Processes ─────────────────────────────────────────
         self._proc_box.configure(state='normal')

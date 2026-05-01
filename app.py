@@ -174,34 +174,46 @@ class MintScanApp:
     def _show_welcome(self):
         from widgets import Btn, Card
         pop = ctk.CTkToplevel(self.root)
-        pop.title("Welcome to Mint Scan")
-        pop.geometry("600x480")
+        pop.title("Welcome to Mint Scan v8")
+        pop.geometry("620x500")
         pop.configure(fg_color=C['bg'])
         pop.attributes('-topmost', True)
         pop.resizable(False, False)
-        pop.update_idletasks()
-        w = pop.winfo_width()
-        h = pop.winfo_height()
-        x = (pop.winfo_screenwidth() // 2) - (w // 2)
-        y = (pop.winfo_screenheight() // 2) - (h // 2)
-        pop.geometry(f'+{x}+{y}')
+        
+        # Center the window
+        self.root.update_idletasks()
+        w_width, w_height = 620, 500
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (w_width // 2)
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (w_height // 2)
+        pop.geometry(f'{w_width}x{w_height}+{x}+{y}')
+
         inner = ctk.CTkFrame(pop, fg_color='transparent')
         inner.pack(fill='both', expand=True, padx=30, pady=30)
-        ctk.CTkLabel(inner, text="[ MINT SCAN ]", font=(FONT, 28, 'bold'), text_color=C['ac']).pack(pady=(0,5))
+        
+        ctk.CTkLabel(inner, text="[ MINT SCAN ]", font=(FONT, 32, 'bold'), text_color=C['ac']).pack(pady=(0,5))
         ctk.CTkLabel(inner, text=f"Version {VERSION} — Global Security Suite", font=(FONT, 12), text_color=C['mu']).pack()
-        ctk.CTkLabel(inner, text="DEVELOPED BY MINT PROJECTS PTY (LTD)", font=(FONT, 9, 'bold'), text_color=C['bl']).pack(pady=(10,20))
+        ctk.CTkLabel(inner, text="DEVELOPED BY MINT PROJECTS PTY (LTD)", font=(FONT, 9, 'bold'), text_color=C['bl']).pack(pady=(10,15))
+        
         msg = (
             "Welcome to the most advanced security auditor for Linux.\n\n"
             "• Industry-standard Malware Scanning (ClamAV)\n"
             "• Real-time Intrusion Detection (Suricata/Snort)\n"
             "• Live CVE Vulnerability Lookups (NIST NVD)\n"
             "• Secure VPN Client & Wireless Sync Server\n"
-            "• Comprehensive System Hardening & Repair"
+            "• Comprehensive System Hardening & Repair\n\n"
+            "Your system is currently being scanned in the background."
         )
+        
         info_card = Card(inner, accent=C['ac'])
         info_card.pack(fill='x', pady=10)
-        ctk.CTkLabel(info_card, text=msg, font=(FONT, 10), text_color=C['tx'], justify='left').pack(padx=20, pady=20)
-        Btn(inner, "GET STARTED", command=pop.destroy, variant='success', width=200, height=40).pack(pady=20)
+        
+        # Standard label in Card (Card is now a proper CTkFrame subclass)
+        ctk.CTkLabel(info_card, text=msg, font=(FONT, 10), text_color=C['tx'], 
+                     justify='left', wraplength=500).pack(padx=20, pady=15)
+        
+        Btn(inner, "PROCEED TO DASHBOARD", command=pop.destroy, 
+            variant='success', width=280, height=45).pack(pady=20)
+        
         ctk.CTkLabel(inner, text="© 2026 Pretoria, South Africa", font=(FONT, 8), text_color=C['mu']).pack(side='bottom')
 
     # ── PRELOAD SCREEN CLASSES ────────────────────────────────

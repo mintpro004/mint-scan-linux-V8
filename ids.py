@@ -373,9 +373,15 @@ class IDSScreen(ctk.CTkFrame):
                 return
         except Exception:
             return
+        
+        # Check if logs exist first
+        ids = detect_ids()
+        log_missing = not ids['suricata_log'] and not ids['snort_log']
+        
         alerts = get_recent_alerts(100)
         self._alert_log.configure(state='normal')
         self._alert_log.delete('1.0', 'end')
+        
         if alerts:
             n_crit = sum(1 for a in alerts if a['level'] == 'CRITICAL')
             n_high = sum(1 for a in alerts if a['level'] == 'HIGH')
@@ -387,20 +393,20 @@ class IDSScreen(ctk.CTkFrame):
                 self._alert_log.insert('end', f"{icon} [{a['source']}] {a['line']}\n")
         else:
             self._alert_count.configure(text='No alerts', text_color=C['mu'])
-            ids = detect_ids()
             if not ids['suricata'] and not ids['snort']:
                 msg = ('Neither Suricata nor Snort is installed.\n\n'
-                       '→ Tap ⬇ INSTALL SURICATA in the Suricata section above.\n'
+                       '→ Tap ⬇ INSTALL SURICATA below.\n'
                        '→ After installing, tap ▶ START to begin monitoring.\n\n'
-                       'Suricata is recommended — it supports EVE JSON output\n'
-                       'and has a community ruleset (sudo suricata-update).')
+                       'IDS requires a backend tool to capture and analyze network packets.')
             elif not ids['suricata_running'] and not ids['snort_running']:
-                msg = (f'IDS installed but not running.\n\n'
-                       f'→ Tap ▶ START in the Suricata section above.\n'
+                msg = (f'IDS installed but STOPPED.\n\n'
+                       f'→ Tap ▶ START in the sections above.\n'
                        f'→ Listening interface: {self._get_iface()}\n\n'
-                       f'Alerts will appear here in real-time once running.')
+                       f'Real-time alerts will appear here as threats are detected.')
             else:
-                msg = f'IDS running on {self._get_iface()} — no alerts yet.\nAlert output will appear here as threats are detected.'
+                msg = (f'IDS running on {self._get_iface()} — no alerts found yet.\n\n'
+                       'This is normal if there is no suspicious traffic.\n'
+                       'Check if logs are accessible: ' + (ids['suricata_log'] or ids['snort_log'] or 'logs not found'))
             self._alert_log.insert('end', msg)
         self._alert_log.configure(state='disabled')
 

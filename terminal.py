@@ -75,6 +75,31 @@ class TerminalScreen(ctk.CTkFrame):
             variant='ghost',  width=70).pack(side='right', padx=4, pady=8)
         Btn(hdr, '⏹ KILL',   command=self._kill_proc,
             variant='danger', width=70).pack(side='right', padx=4, pady=8)
+        
+        # Theme selector
+        self._theme_var = tk.StringVar(value='Matrix')
+        self._theme_menu = ctk.CTkOptionMenu(
+            hdr, variable=self._theme_var, values=['Matrix', 'Classic', 'Solarized', 'White', 'Dracula'],
+            command=self._apply_terminal_theme, width=110, height=28,
+            fg_color=C['s2'], button_color=C['br2'], dropdown_fg_color=C['sf'])
+        self._theme_menu.pack(side='right', padx=8)
+        ctk.CTkLabel(hdr, text='Theme:', font=('DejaVu Sans Mono', 8), text_color=C['mu']).pack(side='right')
+
+    def _apply_terminal_theme(self, choice):
+        themes = {
+            'Matrix':    {'bg': '#010d18', 'fg': '#33ff88', 'insert': '#00ffe0'},
+            'Classic':   {'bg': '#000000', 'fg': '#ffffff', 'insert': '#ffffff'},
+            'Solarized': {'bg': '#002b36', 'fg': '#839496', 'insert': '#268bd2'},
+            'White':     {'bg': '#ffffff', 'fg': '#000000', 'insert': '#000000'},
+            'Dracula':   {'bg': '#282a36', 'fg': '#f8f8f2', 'insert': '#bd93f9'},
+        }
+        t = themes.get(choice, themes['Matrix'])
+        self._output.configure(fg_color=t['bg'], text_color=t['fg'])
+        self._input.configure(fg_color=t['bg'], text_color=t['fg'])
+        try:
+            tw = self._output._textbox
+            tw.configure(insertbackground=t['insert'])
+        except Exception: pass
 
         # Output area
         out_wrap = ctk.CTkFrame(self, fg_color='#010d18', corner_radius=0)
@@ -90,6 +115,26 @@ class TerminalScreen(ctk.CTkFrame):
             wrap='none',
             state='normal')
         self._output.pack(fill='both', expand=True, padx=0, pady=0)
+
+        self._font_size = 12
+        # Bind zoom
+        self._output.bind("<Control-MouseWheel>", self._on_zoom)
+        self._output.bind("<Control-plus>",       lambda e: self._on_zoom(delta=1))
+        self._output.bind("<Control-equal>",      lambda e: self._on_zoom(delta=1))
+        self._output.bind("<Control-minus>",      lambda e: self._on_zoom(delta=-1))
+        self._input.bind("<Control-plus>",        lambda e: self._on_zoom(delta=1))
+        self._input.bind("<Control-minus>",       lambda e: self._on_zoom(delta=-1))
+
+    def _on_zoom(self, event=None, delta=0):
+        if event and hasattr(event, 'delta'):
+            delta = 1 if event.delta > 0 else -1
+        
+        self._font_size = max(6, min(48, self._font_size + delta))
+        new_font = ('DejaVu Sans Mono', self._font_size)
+        self._output.configure(font=new_font)
+        self._input.configure(font=new_font)
+        self._prompt_lbl.configure(font=('DejaVu Sans Mono', self._font_size, 'bold'))
+        return 'break'
 
         # Configure inner text widget for crisp rendering + right-click paste
         try:
