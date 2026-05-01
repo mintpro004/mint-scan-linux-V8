@@ -100,21 +100,28 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
                          scrollbar_button_color=sbc,
                          scrollbar_button_hover_color=sbhc,
                          corner_radius=cr, **kwargs)
-        # Linux / Chromebook MouseWheel support
-        self.bind_all("<Button-4>", lambda e: self._on_mousewheel(e), add="+")
-        self.bind_all("<Button-5>", lambda e: self._on_mousewheel(e), add="+")
-        self.bind_all("<MouseWheel>", lambda e: self._on_mousewheel(e), add="+")
+        
+        # Safe binding: only bind all when mouse is inside
+        self.bind("<Enter>", self._bind_mousewheel)
+        self.bind("<Leave>", self._unbind_mousewheel)
+
+    def _bind_mousewheel(self, event=None):
+        self.bind_all("<Button-4>", self._on_mousewheel, add="+")
+        self.bind_all("<Button-5>", self._on_mousewheel, add="+")
+        self.bind_all("<MouseWheel>", self._on_mousewheel, add="+")
+
+    def _unbind_mousewheel(self, event=None):
+        self.unbind_all("<Button-4>")
+        self.unbind_all("<Button-5>")
+        self.unbind_all("<MouseWheel>")
 
     def _on_mousewheel(self, event):
-        if not self.winfo_exists(): return
-        # Only scroll if the mouse is over this widget or its children
         try:
-            w = self.winfo_containing(event.x_root, event.y_root)
-            if w and str(w).startswith(str(self)):
-                if event.num == 4 or event.delta > 0:
-                    self._parent_canvas.yview_scroll(-1, "units")
-                elif event.num == 5 or event.delta < 0:
-                    self._parent_canvas.yview_scroll(1, "units")
+            if not self.winfo_exists(): return
+            if event.num == 4 or (hasattr(event, 'delta') and event.delta > 0):
+                self._parent_canvas.yview_scroll(-1, "units")
+            elif event.num == 5 or (hasattr(event, 'delta') and event.delta < 0):
+                self._parent_canvas.yview_scroll(1, "units")
         except Exception:
             pass
 
@@ -229,24 +236,33 @@ class ResultBox(ctk.CTkFrame):
             self._box = None
 
     def set(self, text):
-        if self._box:
-            self._box.configure(state='normal')
-            self._box.delete('1.0', 'end')
-            self._box.insert('end', str(text))
-            self._box.configure(state='disabled')
+        try:
+            if self._box and self._box.winfo_exists():
+                self._box.configure(state='normal')
+                self._box.delete('1.0', 'end')
+                self._box.insert('end', str(text))
+                self._box.configure(state='disabled')
+        except Exception:
+            pass
 
     def append(self, text):
-        if self._box:
-            self._box.configure(state='normal')
-            self._box.insert('end', str(text) + '\n')
-            self._box.see('end')
-            self._box.configure(state='disabled')
+        try:
+            if self._box and self._box.winfo_exists():
+                self._box.configure(state='normal')
+                self._box.insert('end', str(text) + '\n')
+                self._box.see('end')
+                self._box.configure(state='disabled')
+        except Exception:
+            pass
 
     def clear(self):
-        if self._box:
-            self._box.configure(state='normal')
-            self._box.delete('1.0', 'end')
-            self._box.configure(state='disabled')
+        try:
+            if self._box and self._box.winfo_exists():
+                self._box.configure(state='normal')
+                self._box.delete('1.0', 'end')
+                self._box.configure(state='disabled')
+        except Exception:
+            pass
 
     def configure(self, **kwargs):
         if 'rtype' in kwargs:

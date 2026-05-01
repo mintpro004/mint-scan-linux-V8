@@ -5,7 +5,7 @@ full clipboard Traffic Log, live connection table, public IP panel.
 """
 import tkinter as tk
 import customtkinter as ctk
-import threading, time, math, os, csv, io
+import threading, time, math, os, csv, io, queue
 from widgets import (C, MONO, MONO_SM, ScrollableFrame, Card, SectionHeader,
                      InfoGrid, ResultBox, Btn, LiveBadge)
 from utils import (get_network_interfaces, get_public_ip_info, get_local_ip,
@@ -279,6 +279,8 @@ class NetworkScreen(ctk.CTkFrame):
         self._traffic_proc   = None
         self._find_positions = []
         self._find_idx       = 0
+        self._log_queue      = queue.Queue()
+        self._log_active     = False
 
     def on_focus(self):
         if not self._built:
@@ -286,11 +288,15 @@ class NetworkScreen(ctk.CTkFrame):
             self._built = True
         self._start_ping()
         threading.Thread(target=self._load, daemon=True).start()
+        if not self._log_active:
+            self._log_active = True
+            self._process_log_queue()
 
     def on_blur(self):
         """Stop background threads when leaving this tab."""
         self._ping_running = False
         self._traffic_running = False
+        self._log_active = False
         if self._traffic_proc:
             try:
                 self._traffic_proc.terminate()
@@ -760,16 +766,31 @@ class NetworkScreen(ctk.CTkFrame):
                                             text_color=C['mu'])))
 
     def _tlog_line(self, msg):
+        self._log_queue.put(msg)
+
+    def _process_log_queue(self):
+        if not self._log_active: return
         try:
-            if not self.winfo_exists():
-                return
-            if not hasattr(self, '_tlog') or not self._tlog.winfo_exists():
-                return
-            ts = time.strftime('%H:%M:%S')
-            self._tlog.insert('end', f'[{ts}] {msg}\n')
-            self._tlog.see('end')
+            if not self.winfo_exists(): return
+            
+            msgs = []
+            while not self._log_queue.empty():
+                msgs.append(self._log_queue.get_nowait())
+                if len(msgs) > 100: break
+                
+            if msgs:
+                self._tlog.configure(state='normal')
+                ts = time.strftime('%H:%M:%S')
+                for m in msgs:
+                    self._tlog.insert('end', f"[{ts}] {m}\n")
+                self._tlog.see('end')
+                # Cap buffer
+                line_count = int(self._tlog.index('end').split('.')[0])
+                if line_count > 3000:
+                    self._tlog.delete('1.0', f'{line_count - 2000}.0')
         except Exception:
             pass
+        self.after(100, self._process_log_queue)
 
     def _analyze(self):
         txt = self._tlog.get('1.0','end').strip()
