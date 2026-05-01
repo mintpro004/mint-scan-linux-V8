@@ -505,32 +505,39 @@ def get_battery_info():
     base = '/sys/class/power_supply'
     if not os.path.exists(base):
         return None
-    for name in os.listdir(base):
-        path = os.path.join(base, name)
-        try:
-            ptype = open(os.path.join(path, 'type')).read().strip()
-            if ptype == 'Battery':
-                def r(f):
-                    fp = os.path.join(path, f)
-                    return open(fp).read().strip() if os.path.exists(fp) else None
-                cap     = r('capacity')
-                status  = r('status')
-                health  = r('health')
-                tech    = r('technology')
-                voltage = r('voltage_now')
-                current = r('current_now')
-                cycles  = r('cycle_count')
-                return {
-                    'level':   int(cap) if cap else None,
-                    'status':  status or 'Unknown',
-                    'health':  health or 'Unknown',
-                    'tech':    tech or 'Unknown',
-                    'voltage': f"{int(voltage)/1e6:.2f}V" if voltage else '—',
-                    'current': f"{abs(int(current))/1e6:.2f}A" if current else '—',
-                    'cycles':  cycles or '—',
-                }
-        except Exception:
-            continue
+    try:
+        for name in os.listdir(base):
+            path = os.path.join(base, name)
+            try:
+                type_path = os.path.join(path, 'type')
+                if not os.path.exists(type_path): continue
+                ptype = open(type_path).read().strip()
+                if ptype == 'Battery':
+                    def r(f):
+                        fp = os.path.join(path, f)
+                        try:
+                            return open(fp).read().strip() if os.path.exists(fp) else None
+                        except: return None
+                    cap     = r('capacity')
+                    status  = r('status')
+                    health  = r('health')
+                    tech    = r('technology')
+                    voltage = r('voltage_now')
+                    current = r('current_now')
+                    cycles  = r('cycle_count')
+                    return {
+                        'level':   int(cap) if cap and cap.isdigit() else 0,
+                        'status':  status or 'Unknown',
+                        'health':  health or 'Unknown',
+                        'tech':    tech or 'Unknown',
+                        'voltage': f"{int(voltage)/1e6:.2f}V" if voltage and voltage.isdigit() else '—',
+                        'current': f"{abs(int(current))/1e6:.2f}A" if current and current.replace('-','').isdigit() else '—',
+                        'cycles':  cycles or '—',
+                    }
+            except Exception:
+                continue
+    except Exception:
+        pass
     return None
 
 
@@ -569,19 +576,23 @@ def get_system_info():
 
 def get_processes(top_n=20):
     """Get top processes by CPU usage."""
-    out, _, _ = run_cmd(f"ps aux --sort=-%cpu | head -{top_n+1} 2>/dev/null")
-    procs = []
-    for line in out.strip().split('\n')[1:]:
-        parts = line.split(None, 10)
-        if len(parts) >= 11:
-            procs.append({
-                'user':    parts[0],
-                'pid':     parts[1],
-                'cpu':     parts[2],
-                'mem':     parts[3],
-                'command': parts[10][:50],
-            })
-    return procs
+    try:
+        out, _, rc = run_cmd(f"ps aux --sort=-%cpu | head -{top_n+1} 2>/dev/null")
+        if rc != 0 or not out: return []
+        procs = []
+        for line in out.strip().split('\n')[1:]:
+            parts = line.split(None, 10)
+            if len(parts) >= 11:
+                procs.append({
+                    'user':    parts[0],
+                    'pid':     parts[1],
+                    'cpu':     parts[2],
+                    'mem':     parts[3],
+                    'command': parts[10][:50],
+                })
+        return procs
+    except:
+        return []
 
 
 def get_open_ports():

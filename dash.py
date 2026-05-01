@@ -481,38 +481,40 @@ class DashScreen(ctk.CTkFrame):
 
         # ── System grid ───────────────────────────────────────
         for w in self._sys_frame.winfo_children(): w.destroy()
-        InfoGrid(self._sys_frame, [
-            ('OS',       sysinfo.get('os','—')),
-            ('DISTRO',   sysinfo.get('distro','—')[:28]),
-            ('KERNEL',   sysinfo.get('kernel','—')),
-            ('HOSTNAME', sysinfo.get('hostname','—')),
-            ('ARCH',     sysinfo.get('arch','—')),
-            ('CPU CORES',sysinfo.get('cpu_cores','—')),
-            ('CPU MODEL',sysinfo.get('cpu_model','—')[:24], C['ac']),
-            ('RAM TOTAL',sysinfo.get('ram_total','—'), C['ac']),
-            ('RAM USED', sysinfo.get('ram_used','—')),
-            ('RAM FREE', sysinfo.get('ram_free','—')),
-            ('DISK TOTAL',sysinfo.get('disk_total','—')),
-            ('DISK USED',sysinfo.get('disk_used','—')),
-            ('DISK FREE',sysinfo.get('disk_free','—')),
-            ('DISK %',   sysinfo.get('disk_pct','—'),
+        sys_data = [
+            ('OS',       sysinfo.get('os','N/A')),
+            ('DISTRO',   sysinfo.get('distro','N/A')[:28]),
+            ('KERNEL',   sysinfo.get('kernel','N/A')),
+            ('HOSTNAME', sysinfo.get('hostname','N/A')),
+            ('ARCH',     sysinfo.get('arch','N/A')),
+            ('CPU CORES',sysinfo.get('cpu_cores','N/A')),
+            ('CPU MODEL',sysinfo.get('cpu_model','N/A')[:24] if sysinfo.get('cpu_model') else 'N/A', C['ac']),
+            ('RAM TOTAL',sysinfo.get('ram_total','N/A'), C['ac']),
+            ('RAM USED', sysinfo.get('ram_used','N/A')),
+            ('RAM FREE', sysinfo.get('ram_free','N/A')),
+            ('DISK TOTAL',sysinfo.get('disk_total','N/A')),
+            ('DISK USED',sysinfo.get('disk_used','N/A')),
+            ('DISK FREE',sysinfo.get('disk_free','N/A')),
+            ('DISK %',   sysinfo.get('disk_pct','N/A'),
              C['wn'] if int((sysinfo.get('disk_pct','0%') or '0%').replace('%','') or 0)>85 else C['ok']),
-            ('UPTIME',   sysinfo.get('uptime','—')),
-        ], columns=3).pack(fill='x')
+            ('UPTIME',   sysinfo.get('uptime','N/A')),
+        ]
+        InfoGrid(self._sys_frame, sys_data, columns=3).pack(fill='x')
 
         # ── Net grid ──────────────────────────────────────────
         for w in self._net_frame.winfo_children(): w.destroy()
-        InfoGrid(self._net_frame, [
-            ('LOCAL IP',  local_ip,                    C['am']),
-            ('PUBLIC IP', ipinfo.get('ip','—'),         C['wn']),
-            ('ISP',       ipinfo.get('org','—')),
-            ('COUNTRY',   ipinfo.get('country_name','—')),
-            ('CITY',      ipinfo.get('city','—')),
-            ('TIMEZONE',  ipinfo.get('timezone','—')),
-            ('ASN',       ipinfo.get('asn','—')),
-            ('CURRENCY',  ipinfo.get('currency_name','—')),
-            ('LATITUDE',  str(ipinfo.get('latitude','—'))),
-        ], columns=3).pack(fill='x')
+        net_data = [
+            ('LOCAL IP',  local_ip if local_ip else 'N/A',                    C['am']),
+            ('PUBLIC IP', ipinfo.get('ip','Detecting...'),         C['wn']),
+            ('ISP',       ipinfo.get('org','N/A')),
+            ('COUNTRY',   ipinfo.get('country_name','N/A')),
+            ('CITY',      ipinfo.get('city','N/A')),
+            ('TIMEZONE',  ipinfo.get('timezone','N/A')),
+            ('ASN',       ipinfo.get('asn','N/A')),
+            ('CURRENCY',  ipinfo.get('currency_name','N/A')),
+            ('LATITUDE',  str(ipinfo.get('latitude','N/A'))),
+        ]
+        InfoGrid(self._net_frame, net_data, columns=3).pack(fill='x')
 
         # ── Battery ───────────────────────────────────────────
         for w in self._bat_frame.winfo_children(): w.destroy()
