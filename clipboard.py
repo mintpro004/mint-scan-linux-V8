@@ -48,14 +48,11 @@ class ClipboardScreen(ctk.CTkFrame):
         self._render_history()
 
     def _monitor_clipboard(self):
+        from utils import get_from_clipboard
         last_val = ""
         while self._running:
             try:
-                # Try to get clipboard content
-                root = tk.Tk()
-                root.withdraw()
-                current_val = root.clipboard_get()
-                root.destroy()
+                current_val = get_from_clipboard()
                 
                 if current_val and current_val != last_val:
                     last_val = current_val

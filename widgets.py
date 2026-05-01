@@ -100,6 +100,22 @@ class ScrollableFrame(ctk.CTkScrollableFrame):
                          scrollbar_button_color=sbc,
                          scrollbar_button_hover_color=sbhc,
                          corner_radius=cr, **kwargs)
+        # Linux MouseWheel support
+        self.bind_all("<Button-4>", lambda e: self._on_mousewheel(e), add="+")
+        self.bind_all("<Button-5>", lambda e: self._on_mousewheel(e), add="+")
+
+    def _on_mousewheel(self, event):
+        if not self.winfo_exists(): return
+        # Only scroll if the mouse is over this widget or its children
+        try:
+            w = self.winfo_containing(event.x_root, event.y_root)
+            if w and str(w).startswith(str(self)):
+                if event.num == 4:
+                    self._parent_canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    self._parent_canvas.yview_scroll(1, "units")
+        except Exception:
+            pass
 
 
 # ── Card ──────────────────────────────────────────────────────────
@@ -145,10 +161,8 @@ class Card(ctk.CTkFrame):
                                  corner_radius=cr + 1, border_width=0)
         self._hl.pack(fill='both', expand=True, padx=(1, 0), pady=(1, 0))
 
-        # Optional accent top bar
         if accent:
-            ctk.CTkFrame(self._hl, height=2, fg_color=accent,
-                         corner_radius=0).pack(fill='x', side='top')
+            ctk.CTkFrame(self._hl, height=2, fg_color=accent, corner_radius=0).pack(fill='x', side='top')
 
         # Content surface — the actual fg colour shown to user
         self._inner = ctk.CTkFrame(self._hl, fg_color=fg,
@@ -169,13 +183,6 @@ class Card(ctk.CTkFrame):
         """Return self._inner so child widgets render on the content surface."""
         return self._inner
 
-    # Intercept CTkWidget creation: redirect children to _inner
-    def nametowidget(self, name):
-        try:
-            return self._inner.nametowidget(name)
-        except Exception:
-            return super().nametowidget(name)
-
     # Standard geometry — Card itself is placed by the caller
     def winfo_children(self):
         return self._inner.winfo_children()
@@ -184,17 +191,6 @@ class Card(ctk.CTkFrame):
     def interior(self):
         """Explicit access to the content surface for complex layouts."""
         return self._inner
-
-
-# ── IMPORTANT: Child widgets of Card ─────────────────────────────
-# The Card architecture means child widgets (ctk.CTkLabel, ctk.CTkFrame, etc.)
-# placed as Card(parent) children go into the Card's outer shadow frame by default.
-# To put them on the visible surface, use Card._inner or Card.interior.
-#
-# However, all existing screen code does: ctk.CTkLabel(card, ...).pack()
-# which places the label into the card's own tk frame. This works visually
-# because Card's fg_color is C['sf'] for the inner frame area.
-# The bevel effect comes from the shell/hl layers using pack with padding.
 
 
 # ── SectionHeader ─────────────────────────────────────────────────
@@ -237,52 +233,112 @@ class InfoGrid(ctk.CTkFrame):
 
 # ── ResultBox ─────────────────────────────────────────────────────
 class ResultBox(ctk.CTkFrame):
-    """Scrollable read-only output box."""
-    def __init__(self, parent, height=200, **kwargs):
-        fg = kwargs.pop('fg_color', C['bg'])
+    """
+    Styled result box for scan findings.
+    Supports (rtype, title, msg) API for compatibility with all screens.
+    """
+    def __init__(self, parent, rtype='ok', title='', msg='', height=None, **kwargs):
+        fg = kwargs.pop('fg_color', C['sf'])
         super().__init__(parent, fg_color='transparent', **kwargs)
-        self._box = ctk.CTkTextbox(
-            self, height=height, font=(FONT, 10),
-            fg_color=fg, text_color=C['ok'],
-            border_color=C['br'], border_width=1,
-            corner_radius=6, wrap='none')
-        self._box.pack(fill='both', expand=True)
-        self._box.configure(state='disabled')
+        
+        # Color based on rtype
+        if rtype == 'ok':
+            col = C['ok']
+        elif rtype in ('med', 'warn', 'warning'):
+            col = C['am']
+        elif rtype in ('info', 'blue'):
+            col = C['bl']
+        else:
+            col = C['wn']
+        
+        self._card = ctk.CTkFrame(self, fg_color=fg, border_color=col, border_width=1, corner_radius=8)
+        self._card.pack(fill='both', expand=True)
+        
+        inner = ctk.CTkFrame(self._card, fg_color='transparent')
+        inner.pack(fill='both', expand=True, padx=12, pady=10)
+        
+        # Title row with icon
+        icon = '✓' if rtype == 'ok' else '⚠'
+        self.title_lbl = ctk.CTkLabel(inner, text=f"{icon} {title}", 
+                                      font=(FONT, 11, 'bold'), text_color=col)
+        self.title_lbl.pack(anchor='w')
+        
+        # Message / Details
+        if msg:
+            self._box = ctk.CTkTextbox(inner, height=height or 60, font=(FONT, 10),
+                                        fg_color='transparent', text_color=C['tx'],
+                                        border_width=0, wrap='word')
+            self._box.pack(fill='x', pady=(4, 0))
+            self._box.insert('1.0', str(msg))
+            self._box.configure(state='disabled')
+        else:
+            self._box = None
 
     def set(self, text):
-        self._box.configure(state='normal')
-        self._box.delete('1.0', 'end')
-        self._box.insert('end', str(text))
-        self._box.configure(state='disabled')
+        if self._box:
+            self._box.configure(state='normal')
+            self._box.delete('1.0', 'end')
+            self._box.insert('end', str(text))
+            self._box.configure(state='disabled')
 
     def append(self, text):
-        self._box.configure(state='normal')
-        self._box.insert('end', str(text) + '\n')
-        self._box.see('end')
-        self._box.configure(state='disabled')
+        if self._box:
+            self._box.configure(state='normal')
+            self._box.insert('end', str(text) + '\n')
+            self._box.see('end')
+            self._box.configure(state='disabled')
 
     def clear(self):
-        self._box.configure(state='normal')
-        self._box.delete('1.0', 'end')
-        self._box.configure(state='disabled')
+        if self._box:
+            self._box.configure(state='normal')
+            self._box.delete('1.0', 'end')
+            self._box.configure(state='disabled')
+
+
+# ── LiveBadge ─────────────────────────────────────────────────────
+class LiveBadge(ctk.CTkFrame):
+    """Pulsing 'LIVE' status indicator."""
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, fg_color='transparent', **kwargs)
+        self._on = True
+        self.dot = ctk.CTkLabel(self, text='●', font=(FONT, 14), text_color=C['ok'])
+        self.dot.pack(side='left', padx=(2, 4))
+        ctk.CTkLabel(self, text='LIVE', font=(FONT, 9, 'bold'), 
+                     text_color=C['mu']).pack(side='left', padx=(0, 2))
+        self._pulse()
+
+    def _pulse(self):
+        if not self.winfo_exists(): return
+        self._on = not self._on
+        col = C['ok'] if self._on else C['br']
+        try:
+            self.dot.configure(text_color=col)
+        except Exception: pass
+        self.after(800, self._pulse)
 
 
 # ── Btn ───────────────────────────────────────────────────────────
 class Btn(ctk.CTkButton):
     """
-    Styled button — variants: default, ghost, danger, blue.
+    Styled button with variant support.
     """
     VARIANTS = {
-        'default': lambda: dict(fg_color=C['ac'],       text_color='#030f1c',
-                                hover_color=C['mu2'],   border_width=0),
+        'default': lambda: dict(fg_color=C['ac'],   text_color='#030f1c',
+                                hover_color=C['mu2'], border_width=0),
+        'primary': lambda: dict(fg_color=C['ac'],   text_color='#030f1c',
+                                hover_color=C['mu2'], border_width=0),
+        'success': lambda: dict(fg_color=C['ok'],   text_color='#030f1c',
+                                hover_color='#2cc470', border_width=0),
+        'warning': lambda: dict(fg_color=C['am'],   text_color='#030f1c',
+                                hover_color='#cc9900', border_width=0),
         'ghost':   lambda: dict(fg_color='transparent', text_color=C['ac'],
-                                hover_color=C['acg'],   border_color=C['ac'],
+                                hover_color=C['acg'], border_color=C['ac'],
                                 border_width=1),
-        'danger':  lambda: dict(fg_color=C['wng'],      text_color=C['wn'],
-                                hover_color='#5d0000',  border_color=C['wn'],
+        'danger':  lambda: dict(fg_color=C['wng'],  text_color=C['wn'],
+                                hover_color='#5d0000', border_color=C['wn'],
                                 border_width=1),
-        'blue':    lambda: dict(fg_color=C['bl'],       text_color='#030f1c',
-                                hover_color='#2280cc',  border_width=0),
+        'blue':    lambda: dict(fg_color=C['bl'],   text_color='#030f1c',
+                                hover_color='#2280cc', border_width=0),
     }
 
     def __init__(self, parent, text='', variant='default',

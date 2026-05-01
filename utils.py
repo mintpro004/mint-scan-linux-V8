@@ -121,12 +121,13 @@ def ping(host='1.1.1.1', count=1):
 
 def copy_to_clipboard(text):
     """Copy text to clipboard using xclip, xsel, or tkinter."""
+    if not text: return False
     # Try xclip first (most reliable on Linux)
     if shutil.which('xclip'):
         try:
             p = subprocess.Popen(['xclip', '-selection', 'clipboard'],
-                                  stdin=subprocess.PIPE)
-            p.communicate(input=text.encode())
+                                  stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            p.communicate(input=text.encode(), timeout=2)
             return True
         except Exception:
             pass
@@ -134,24 +135,22 @@ def copy_to_clipboard(text):
     if shutil.which('xsel'):
         try:
             p = subprocess.Popen(['xsel', '--clipboard', '--input'],
-                                  stdin=subprocess.PIPE)
-            p.communicate(input=text.encode())
+                                  stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            p.communicate(input=text.encode(), timeout=2)
             return True
         except Exception:
             pass
-    # Tkinter fallback
-    try:
-        import tkinter as tk
-        root = tk.Tk()
-        root.withdraw()
-        root.clipboard_clear()
-        root.clipboard_append(text)
-        root.update()
-        root.after(2000, root.destroy)
-        root.mainloop()
-        return True
-    except Exception:
-        return False
+    return False
+
+def get_from_clipboard():
+    """Get text from clipboard using xclip or xsel (thread-safe)."""
+    if shutil.which('xclip'):
+        out, _, rc = run_cmd(['xclip', '-selection', 'clipboard', '-o'], timeout=2)
+        if rc == 0: return out
+    if shutil.which('xsel'):
+        out, _, rc = run_cmd(['xsel', '--clipboard', '--output'], timeout=2)
+        if rc == 0: return out
+    return ""
 
 
 # ── Chromebook / Crostini detection ──────────────────────────────────────────
