@@ -43,15 +43,14 @@ else
 fi
 
 # ── [1/7] Ownership fix ──────────────────────────────────────────
+echo "[1/7] Fixing ownership..."
+sudo chown -R "$USER:$USER" "$SCRIPT_DIR" 2>/dev/null || true
+echo "  ✓ Done"
 
 # Remove development/test files that should not be in production
 for testfile in reproduce_injection.py test_fix.py; do
     [ -f "$testfile" ] && rm -f "$testfile" && echo "  Removed: $testfile"
 done
-
-echo "[1/7] Fixing ownership..."
-sudo chown -R "$USER:$USER" "$SCRIPT_DIR" 2>/dev/null || true
-echo "  ✓ Done"
 
 # ── [2/7] System packages ────────────────────────────────────────
 echo "[2/7] Installing system packages..."
@@ -154,15 +153,19 @@ if [ $FAIL_COUNT -gt 0 ]; then
     exit 1
 fi
 
-# Quick Card widget smoke test — catches the aarch64 CTkFrame _w issue
+# Quick Card widget smoke test — verifies aarch64 stability
 WIDGET_OK=$(python3 -c "
 import sys, os
 sys.path.insert(0, os.getcwd())
 try:
     from widgets import Card, Btn, ScrollableFrame, C
-    # Verify Card is NOT a CTkFrame subclass (that's the fix)
-    import customtkinter as ctk
-    assert not issubclass(Card, ctk.CTkFrame), 'Card must not subclass CTkFrame'
+    # Verify Card can be instantiated without crashing
+    import tkinter as tk
+    root = tk.Tk()
+    root.withdraw()
+    c = Card(root)
+    c.destroy()
+    root.destroy()
     print('OK')
 except Exception as e:
     print(f'FAIL: {e}')

@@ -211,13 +211,19 @@ class SectionHeader(ctk.CTkFrame):
 # ── InfoGrid ──────────────────────────────────────────────────────
 class InfoGrid(ctk.CTkFrame):
     """
-    Responsive stat grid. Each item is (label, value, colour).
+    Responsive stat grid. Each item is (label, value, colour) OR (label, value).
     columns=3 default.
     """
     def __init__(self, parent, items, columns=3, **kwargs):
         fg = kwargs.pop('fg_color', 'transparent')
         super().__init__(parent, fg_color=fg, **kwargs)
-        for i, (label, value, colour) in enumerate(items):
+        for i, item in enumerate(items):
+            if len(item) == 3:
+                label, value, colour = item
+            else:
+                label, value = item
+                colour = C['tx']
+            
             cell = ctk.CTkFrame(self, fg_color=C['s2'],
                                 corner_radius=6, border_width=0)
             cell.grid(row=i // columns, column=i % columns,
