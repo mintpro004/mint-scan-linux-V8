@@ -9,8 +9,11 @@ import threading, time, math, platform, os
 from widgets import (C, MONO, MONO_SM, MONO_LG, MONO_XL, FONT, ScrollableFrame,
                      Card, SectionHeader, InfoGrid, ResultBox, Btn)
 from utils import (get_system_info, get_public_ip_info, get_local_ip,
-                   get_battery_info, get_open_ports, get_processes, run_cmd)
+                   get_battery_info, get_open_ports, get_processes, run_cmd, get_uid)
 from database import db
+from logger import get_logger
+
+log = get_logger('dash')
 
 
 # ── Canvas helpers ────────────────────────────────────────────────
@@ -433,34 +436,27 @@ class DashScreen(ctk.CTkFrame):
         self._pulse.set_color(C['wn'])
 
     def _fetch(self):
+        import psutil
         from concurrent.futures import ThreadPoolExecutor
-        def _get_cpu():
-            # Try /proc/stat first for instant non-blocking read
-            try:
-                with open('/proc/stat') as f:
-                    v1 = list(map(int, f.readline().split()[1:]))
-                time.sleep(0.2)
-                with open('/proc/stat') as f:
-                    v2 = list(map(int, f.readline().split()[1:]))
-                idle = v2[3] - v1[3]
-                total = sum(v2) - sum(v1)
-                return 100.0 * (1 - idle/total) if total > 0 else 0.0
-            except:
-                out, _, _ = run_cmd("top -bn1 | grep 'Cpu(s)' | awk '{print $2}'")
-                try: return float(out.strip().replace('%','').replace(',','.') or 0)
-                except: return 0.0
-        def _get_mem():
-            out, _, _ = run_cmd("free | grep Mem | awk '{printf \"%.0f\", $3/$2*100}'")
-            try: return int(out.strip() or 0)
-            except: return 0
-        def _get_ufw():
-            out, _, _ = run_cmd("ufw status 2>/dev/null | head -1")
-            return 'active' in out.lower()
+        from utils import IS_WINDOWS, IS_LINUX, get_uid
+
+        def _get_fw():
+            if IS_WINDOWS:
+                try:
+                    out, _, _ = run_cmd('netsh advfirewall show allprofiles state')
+                    return 'ON' in out.upper()
+                except: return False
+            else:
+                out, _, _ = run_cmd("ufw status 2>/dev/null | head -1")
+                return 'active' in out.lower()
+
         def _get_pkgs():
-            # apt list is slow, try a faster check if possible
-            out, _, _ = run_cmd("apt list --upgradeable 2>/dev/null | wc -l")
-            try: return max(0, int(out.strip() or 0) - 1)
-            except: return 0
+            if IS_WINDOWS:
+                return 0
+            else:
+                out, _, _ = run_cmd("apt list --upgradeable 2>/dev/null | wc -l")
+                try: return max(0, int(out.strip() or 0) - 1)
+                except: return 0
         
         with ThreadPoolExecutor(max_workers=10) as ex:
             f_sys    = ex.submit(get_system_info)
@@ -469,9 +465,7 @@ class DashScreen(ctk.CTkFrame):
             f_ipinfo = ex.submit(get_public_ip_info)
             f_ports  = ex.submit(get_open_ports)
             f_procs  = ex.submit(get_processes, 10)
-            f_cpu    = ex.submit(_get_cpu)
-            f_mem    = ex.submit(_get_mem)
-            f_ufw    = ex.submit(_get_ufw)
+            f_fw     = ex.submit(_get_fw)
             f_pkgs   = ex.submit(_get_pkgs)
             
         sysinfo  = f_sys.result() or {}
@@ -480,9 +474,9 @@ class DashScreen(ctk.CTkFrame):
         ipinfo   = f_ipinfo.result() or {}
         ports    = f_ports.result() or []
         procs    = f_procs.result() or []
-        cpu      = f_cpu.result()
-        mem_pct  = f_mem.result()
-        fw_ok    = f_ufw.result()
+        cpu      = psutil.cpu_percent(interval=0.1)
+        mem_pct  = psutil.virtual_memory().percent
+        fw_ok    = f_fw.result()
         pkg_n    = f_pkgs.result()
 
         def _safe_render():
@@ -491,7 +485,7 @@ class DashScreen(ctk.CTkFrame):
                     self._render(sysinfo, bat, local_ip, ipinfo, ports, procs,
                                  cpu, mem_pct, fw_ok, pkg_n)
             except Exception as e:
-                print(f"Render error: {e}")
+                log.error(f"Render error: {e}")
         self.after(0, _safe_render)
 
     def _render(self, sysinfo, bat, local_ip, ipinfo, ports, procs,
@@ -504,7 +498,7 @@ class DashScreen(ctk.CTkFrame):
         
         # Security Penalties
         if not fw_ok: score -= 25 # Critical
-        if os.getuid() == 0: score -= 10 # Root usage risk
+        if get_uid() == 0: score -= 10 # Root usage risk
         if pkg_n > 50: score -= 20
         elif pkg_n > 0: score -= 10
         
@@ -578,7 +572,7 @@ class DashScreen(ctk.CTkFrame):
             ('DISK USED',sysinfo.get('disk_used','N/A')),
             ('DISK FREE',sysinfo.get('disk_free','N/A')),
             ('DISK %',   sysinfo.get('disk_pct','N/A'),
-             C['wn'] if int((sysinfo.get('disk_pct','0%') or '0%').replace('%','') or 0)>85 else C['ok']),
+             C['wn'] if int(float((sysinfo.get('disk_pct','0%') or '0%').replace('%','') or 0))>85 else C['ok']),
             ('UPTIME',   sysinfo.get('uptime','N/A')),
         ]
         InfoGrid(self._sys_frame, sys_data, columns=3).pack(fill='x')
@@ -634,29 +628,12 @@ class DashScreen(ctk.CTkFrame):
         if not self._running:
             return
         def _bg():
-            # /proc/stat gives instant CPU usage without top's 1-second delay
-            try:
-                def _read_stat():
-                    with open('/proc/stat') as f:
-                        vals = list(map(int, f.readline().split()[1:]))
-                    idle  = vals[3]
-                    total = sum(vals)
-                    return idle, total
-                i1, t1 = _read_stat()
-                import time as _t; _t.sleep(0.5)
-                i2, t2 = _read_stat()
-                diff_idle  = i2 - i1
-                diff_total = t2 - t1
-                cpu = 100.0 * (1 - diff_idle / diff_total) if diff_total else 0
-            except Exception:
-                cpu = 0
-            mem_out, _, _ = run_cmd("free | grep Mem | awk '{printf \"%.0f\",$3/$2*100}'")
-            try: mem = int(mem_out.strip() or 0)
-            except: mem = 0
-            
+            import psutil
+            cpu = psutil.cpu_percent(interval=0.5)
+            mem = psutil.virtual_memory().percent
+
             # Log to DB
             try:
-                # Mock network rx/tx for now since we're just doing CPU/MEM
                 db.log_stats(cpu, mem, 0, 0)
             except: pass
 
@@ -667,10 +644,11 @@ class DashScreen(ctk.CTkFrame):
                     self._card_cpu._chart and self._card_cpu._chart.push(cpu)
                     self._card_mem._chart and self._card_mem._chart.push(mem)
                     self._card_cpu.update(f'{cpu:.0f}%', 'user+sys', push_chart=None)
-                    self._card_mem.update(f'{mem}%',     '',          push_chart=None)
+                    self._card_mem.update(f'{mem:.0f}%', '', push_chart=None)
                 except Exception:
                     pass
             self.after(0, _ui)
         threading.Thread(target=_bg, daemon=True).start()
         if self._running:
-            self.after(8000, self._live_loop)  # 8s — smooth without hammering
+            self.after(8000, self._live_loop)
+

@@ -7,6 +7,7 @@ import tkinter as tk
 import customtkinter as ctk
 import subprocess, threading, time, os, sys, shutil
 from widgets import C, MONO_SM, Btn
+from utils import get_uid
 
 
 class InstallerPopup(ctk.CTkToplevel):
@@ -143,23 +144,27 @@ class InstallerPopup(ctk.CTkToplevel):
         """
         Run one command with streaming output.
         - Never hangs: uses sudo -n (non-interactive / passwordless).
-        - On Crostini/Chromebook sudo is passwordless by design.
-        - On systems requiring a password, we skip gracefully rather than freeze.
         - Hard timeout of 180 s per command.
         """
-        original = cmd.strip()
-
-        if original.startswith('sudo ') and os.geteuid() != 0:
-            inner   = original[5:].strip()
-            inner_q = inner.replace("'", "'\\''")
-            # -n = non-interactive: fails immediately if password needed
-            # We then retry without sudo in case the operation doesn't require it
-            run_cmd_str = (
-                f"sudo -n bash -c '{inner_q}' 2>/dev/null || "
-                f"sudo DEBIAN_FRONTEND=noninteractive bash -c '{inner_q}'"
-            )
+        is_shell = isinstance(cmd, str)
+        if is_shell:
+            original = cmd.strip()
+            if original.startswith('sudo ') and get_uid() != 0:
+                inner   = original[5:].strip()
+                inner_q = inner.replace("'", "'\\''")
+                # -n = non-interactive: fails immediately if password needed
+                run_cmd_str = (
+                    f"sudo -n bash -c '{inner_q}' 2>/dev/null || "
+                    f"sudo DEBIAN_FRONTEND=noninteractive bash -c '{inner_q}'"
+                )
+            else:
+                run_cmd_str = original
         else:
-            run_cmd_str = original
+            # List-based command: prepends sudo -n if needed
+            if cmd[0] == 'sudo' and get_uid() != 0:
+                run_cmd_str = ['sudo', '-n'] + cmd[1:]
+            else:
+                run_cmd_str = cmd
 
         run_env = {**os.environ,
                    'DEBIAN_FRONTEND': 'noninteractive',
@@ -167,7 +172,7 @@ class InstallerPopup(ctk.CTkToplevel):
 
         try:
             proc = subprocess.Popen(
-                run_cmd_str, shell=True,
+                run_cmd_str, shell=is_shell,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,   # ← prevent any interactive prompt
@@ -186,23 +191,20 @@ class InstallerPopup(ctk.CTkToplevel):
                     proc.terminate()
                     self._log_line('[timeout after 180s — command killed]')
                     return False
+                
+                # Check for output without blocking indefinitely
                 try:
-                    rlist, _, _ = _select.select([proc.stdout], [], [], 0.5)
-                except Exception:
-                    rlist = []
-                if rlist:
-                    line = proc.stdout.readline()
-                    if line == '':
-                        break
-                    stripped = line.rstrip()
-                    if stripped:
-                        self._log_line(stripped)
-                elif proc.poll() is not None:
-                    # Read any remaining output
-                    for line in proc.stdout:
+                    if proc.stdout:
+                        line = proc.stdout.readline()
+                        if line == '':
+                            if proc.poll() is not None:
+                                break
+                            _time.sleep(0.1)
+                            continue
                         stripped = line.rstrip()
                         if stripped:
                             self._log_line(stripped)
+                except Exception:
                     break
 
             proc.wait(timeout=5)
@@ -235,9 +237,9 @@ class InstallerPopup(ctk.CTkToplevel):
 def install_adb(parent, on_done=None):
     InstallerPopup(parent, title="Install ADB — Android Debug Bridge",
         commands=[
-            "sudo apt-get update -qq",
-            "sudo apt-get install -y adb",
-            "adb version",
+            ["sudo", "apt-get", "update", "-qq"],
+            ["sudo", "apt-get", "install", "-y", "adb"],
+            ["adb", "version"],
         ],
         success_msg="ADB installed! Connect your phone and tap RESCAN.",
         on_done=on_done)
@@ -246,10 +248,10 @@ def install_adb(parent, on_done=None):
 def install_clamav(parent, on_done=None):
     InstallerPopup(parent, title="Install ClamAV Antivirus",
         commands=[
-            "sudo apt-get update -qq",
-            "sudo apt-get install -y clamav clamav-daemon",
+            ["sudo", "apt-get", "update", "-qq"],
+            ["sudo", "apt-get", "install", "-y", "clamav", "clamav-daemon"],
             "sudo systemctl stop clamav-freshclam 2>/dev/null || true",
-            "sudo freshclam",
+            ["sudo", "freshclam"],
         ],
         success_msg="ClamAV installed and virus definitions updated!",
         on_done=on_done)
@@ -258,8 +260,8 @@ def install_clamav(parent, on_done=None):
 def install_kdeconnect(parent, on_done=None):
     InstallerPopup(parent, title="Install KDE Connect",
         commands=[
-            "sudo apt-get update -qq",
-            "sudo apt-get install -y kdeconnect",
+            ["sudo", "apt-get", "update", "-qq"],
+            ["sudo", "apt-get", "install", "-y", "kdeconnect"],
         ],
         success_msg="KDE Connect installed!",
         on_done=on_done)
@@ -268,9 +270,9 @@ def install_kdeconnect(parent, on_done=None):
 def install_nmap(parent, on_done=None):
     InstallerPopup(parent, title="Install nmap",
         commands=[
-            "sudo apt-get update -qq",
-            "sudo apt-get install -y nmap",
-            "nmap --version",
+            ["sudo", "apt-get", "update", "-qq"],
+            ["sudo", "apt-get", "install", "-y", "nmap"],
+            ["nmap", "--version"],
         ],
         success_msg="nmap installed!",
         on_done=on_done)
@@ -279,9 +281,9 @@ def install_nmap(parent, on_done=None):
 def install_tcpdump(parent, on_done=None):
     InstallerPopup(parent, title="Install tcpdump",
         commands=[
-            "sudo apt-get update -qq",
-            "sudo apt-get install -y tcpdump",
-            "tcpdump --version 2>&1 | head -1",
+            ["sudo", "apt-get", "update", "-qq"],
+            ["sudo", "apt-get", "install", "-y", "tcpdump"],
+            ["tcpdump", "--version"],
         ],
         success_msg="tcpdump installed!",
         on_done=on_done)
@@ -290,9 +292,9 @@ def install_tcpdump(parent, on_done=None):
 def install_rkhunter(parent, on_done=None):
     InstallerPopup(parent, title="Install rkhunter",
         commands=[
-            "sudo apt-get update -qq",
-            "sudo apt-get install -y rkhunter",
-            "rkhunter --version 2>&1 | head -1",
+            ["sudo", "apt-get", "update", "-qq"],
+            ["sudo", "apt-get", "install", "-y", "rkhunter"],
+            ["rkhunter", "--version"],
         ],
         success_msg="rkhunter installed!",
         on_done=on_done)
@@ -301,9 +303,9 @@ def install_rkhunter(parent, on_done=None):
 def install_ripgrep(parent, on_done=None):
     InstallerPopup(parent, title="Install ripgrep",
         commands=[
-            "sudo apt-get update -qq",
-            "sudo apt-get install -y ripgrep",
-            "rg --version",
+            ["sudo", "apt-get", "update", "-qq"],
+            ["sudo", "apt-get", "install", "-y", "ripgrep"],
+            ["rg", "--version"],
         ],
         success_msg="ripgrep installed! Fast searching is now available.",
         on_done=on_done)
@@ -314,14 +316,14 @@ def install_all_tools(parent, on_done=None):
         commands=[
             'echo "iptables-persistent iptables-persistent/autosave_v4 boolean true" | sudo debconf-set-selections',
             'echo "iptables-persistent iptables-persistent/autosave_v6 boolean true" | sudo debconf-set-selections',
-            "sudo apt-get update -q",
-            "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "
-            "adb nmap tcpdump clamav clamav-daemon rkhunter "
-            "net-tools wireless-tools iw dbus ufw",
+            ["sudo", "apt-get", "update", "-q"],
+            ["sudo", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y", 
+             "adb", "nmap", "tcpdump", "clamav", "clamav-daemon", "rkhunter", 
+             "net-tools", "wireless-tools", "iw", "dbus", "ufw"],
             "sudo systemctl stop clamav-freshclam 2>/dev/null || true",
             "sudo freshclam 2>/dev/null || echo 'freshclam: will retry later'",
-            "sudo ufw --force enable",
-            "echo '✓ All tools installed'",
+            ["sudo", "ufw", "--force", "enable"],
+            'echo "✓ All tools installed"',
         ],
         success_msg="All tools installed successfully!",
         on_done=on_done)

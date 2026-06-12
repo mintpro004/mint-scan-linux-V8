@@ -147,15 +147,17 @@ class NetScanScreen(ctk.CTkFrame):
 
     def _do_dpi(self):
         # Check tshark
-        if subprocess.run("which tshark", shell=True).returncode != 0:
+        if subprocess.run(["which", "tshark"], shell=False).returncode != 0:
             self._log_dpi("Error: 'tshark' not found.\nRun: sudo apt install tshark")
             return
 
         self._log_dpi("Capturing traffic (10s)...")
         # Capture HTTP Host, TLS SNI, DNS Query
-        cmd = ("tshark -i any -a duration:10 -T fields "
-               "-e http.host -e tls.handshake.extensions_server_name -e dns.qry.name "
-               "-Y 'http.request or tls.handshake.type==1 or dns.flags.response==0'")
+        cmd = [
+            "tshark", "-i", "any", "-a", "duration:10", "-T", "fields",
+            "-e", "http.host", "-e", "tls.handshake.extensions_server_name", "-e", "dns.qry.name",
+            "-Y", "http.request or tls.handshake.type==1 or dns.flags.response==0"
+        ]
         
         out, err, rc = run(cmd, timeout=15)
         
@@ -190,8 +192,14 @@ class NetScanScreen(ctk.CTkFrame):
         from utils import _is_crostini
         is_cros = _is_crostini()
         
-        ip_out, _, _ = run("ip route | grep -v default | head -1 | awk '{print $1}'")
-        subnet = ip_out.strip() or '192.168.1.0/24'
+        # Safe way to get subnet without AWK pipe
+        route_out, _, _ = run(["ip", "route"])
+        subnet = "192.168.1.0/24"
+        if route_out:
+            for line in route_out.split('\n'):
+                if 'default' not in line and '/' in line:
+                    subnet = line.split()[0]
+                    break
         
         if is_cros:
             self._safe_after(0, lambda: self._log_traffic(
@@ -199,7 +207,7 @@ class NetScanScreen(ctk.CTkFrame):
                 "Only devices on the internal bridge may be visible."))
 
         # Try nmap first, fallback to arp
-        nmap_out, _, nmap_rc = run(f"nmap -sn {subnet} 2>/dev/null", timeout=30)
+        nmap_out, _, nmap_rc = run(["nmap", "-sn", subnet], timeout=30)
 
         devices = []
         if nmap_rc == 0 and 'Nmap scan' in nmap_out:
@@ -224,13 +232,16 @@ class NetScanScreen(ctk.CTkFrame):
             if current: devices.append(current)
         else:
             # Fallback: arp-scan or arp
-            arp_out, _, _ = run("arp -n 2>/dev/null | grep -v incomplete | tail -n +2")
-            for line in arp_out.split('\n'):
-                parts = line.split()
-                if len(parts) >= 3:
-                    devices.append({'ip': parts[0], 'mac': parts[2],
-                                    'host': parts[1] if len(parts)>3 else '',
-                                    'vendor': '—'})
+            # Use arp -n and filter in Python
+            arp_out, _, _ = run(["arp", "-n"])
+            if arp_out:
+                for line in arp_out.split('\n'):
+                    if 'incomplete' in line or 'Address' in line: continue
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        devices.append({'ip': parts[0], 'mac': parts[2],
+                                        'host': parts[1] if len(parts)>3 else '',
+                                        'vendor': '—'})
 
         self._safe_after(0, self._render_devices, devices, subnet)
 
@@ -276,7 +287,7 @@ class NetScanScreen(ctk.CTkFrame):
     def _do_device_scan(self, ip):
         self._safe_after(0, lambda: self._log_traffic(f"Scanning {ip}..."))
         # Use -sV for service/version detection
-        out, _, _ = run(f"nmap -T4 -sV --open -p 1-1000 {ip} 2>/dev/null", timeout=60)
+        out, _, _ = run(["nmap", "-T4", "-sV", "--open", "-p", "1-1000", ip], timeout=60)
         self._safe_after(0, lambda: self._log_traffic(f"Scan complete for {ip}"))
         
         results = []
@@ -353,7 +364,7 @@ class NetScanScreen(ctk.CTkFrame):
             try:
                 # If we used sudo tcpdump, we need sudo kill to stop it cleanly
                 pid = self._cap_proc.pid
-                run(f"sudo kill {pid} 2>/dev/null")
+                run(["sudo", "kill", str(pid)])
                 self._cap_proc.terminate()
             except Exception:
                 pass
@@ -362,16 +373,16 @@ class NetScanScreen(ctk.CTkFrame):
 
     def _do_capture(self):
         # Use tcpdump if available, otherwise ss for active connections
-        tcpdump, _, rc = run("which tcpdump")
+        tcpdump_path, _, rc = run(["which", "tcpdump"])
         if rc == 0:
-            cmd = "sudo tcpdump -l -n -q -c 100 2>/dev/null"
+            cmd = ["sudo", "tcpdump", "-l", "-n", "-q", "-c", "100"]
         else:
-            cmd = "ss -tnp 2>/dev/null"
+            cmd = ["ss", "-tnp"]
             self._safe_after(0, lambda: self._log_traffic("ℹ tcpdump not found. Displaying active connections via 'ss' instead."))
 
         try:
             self._cap_proc = subprocess.Popen(
-                cmd, shell=True, stdout=subprocess.PIPE,
+                cmd, shell=False, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True)
             count = 0
             for line in self._cap_proc.stdout:
@@ -424,10 +435,8 @@ class NetScanScreen(ctk.CTkFrame):
             txt = root.clipboard_get()
         except Exception:
             try:
-                import subprocess
-                r = subprocess.run('xclip -selection clipboard -o',
-                                   shell=True, capture_output=True, text=True, timeout=2)
-                txt = r.stdout
+                from utils import get_from_clipboard
+                txt = get_from_clipboard()
             except Exception:
                 txt = ''
         if txt:
@@ -571,54 +580,68 @@ class NetScanScreen(ctk.CTkFrame):
         fixes = []
 
         # 1. Check firewall
-        ufw, _, _ = run("ufw status 2>/dev/null")
+        ufw, _, _ = run(["sudo", "ufw", "status"])
         if 'inactive' in ufw.lower():
             vulns.append(('HIGH', 'Firewall (UFW) is INACTIVE',
                           'All incoming connections are unfiltered'))
             fixes.append('Enable firewall: sudo ufw enable && sudo ufw default deny incoming && sudo ufw allow ssh')
 
         # 2. Check open ports
-        ports_out, _, _ = run("ss -tlnp 2>/dev/null")
+        ports_out, _, _ = run(["ss", "-tlnp"])
         dangerous = {'23': 'Telnet', '21': 'FTP', '4444': 'Metasploit', '5900': 'VNC'}
-        for port, svc in dangerous.items():
-            if f':{port} ' in ports_out or f':{port}\n' in ports_out:
-                vulns.append(('HIGH', f'Dangerous port open: {port} ({svc})',
-                              f'{svc} is running and exposed'))
-                fixes.append(f'Close {svc}: sudo ufw deny {port}')
+        if ports_out:
+            for port, svc in dangerous.items():
+                if f':{port} ' in ports_out or f':{port}\n' in ports_out:
+                    vulns.append(('HIGH', f'Dangerous port open: {port} ({svc})',
+                                f'{svc} is running and exposed'))
+                    fixes.append(f'Close {svc}: sudo ufw deny {port}')
 
         # 3. SSH hardening
-        ssh_cfg, _, _ = run("grep -E 'PermitRootLogin|PasswordAuthentication|Port' /etc/ssh/sshd_config 2>/dev/null")
-        if 'PermitRootLogin yes' in ssh_cfg:
-            vulns.append(('HIGH', 'SSH allows root login',
-                          'Root login over SSH is a major security risk'))
-            fixes.append('Edit /etc/ssh/sshd_config: set PermitRootLogin no, then: sudo systemctl restart sshd')
+        ssh_cfg, _, _ = run(["grep", "-E", "PermitRootLogin|PasswordAuthentication|Port", "/etc/ssh/sshd_config"])
+        if ssh_cfg:
+            if 'PermitRootLogin yes' in ssh_cfg:
+                vulns.append(('HIGH', 'SSH allows root login',
+                            'Root login over SSH is a major security risk'))
+                fixes.append('Edit /etc/ssh/sshd_config: set PermitRootLogin no, then: sudo systemctl restart sshd')
 
-        if 'PasswordAuthentication yes' in ssh_cfg:
-            vulns.append(('MED', 'SSH password authentication enabled',
-                          'Brute force attacks possible'))
-            fixes.append('Use SSH keys instead: PasswordAuthentication no in sshd_config')
+            if 'PasswordAuthentication yes' in ssh_cfg:
+                vulns.append(('MED', 'SSH password authentication enabled',
+                            'Brute force attacks possible'))
+                fixes.append('Use SSH keys instead: PasswordAuthentication no in sshd_config')
 
         # 4. Check for unencrypted DNS
-        dns_out, _, _ = run("resolvectl status 2>/dev/null | grep 'DNS Server'")
-        if '8.8.8.8' in dns_out or '1.1.1.1' in dns_out:
-            vulns.append(('MED', 'Using plain DNS (not encrypted)',
-                          'DNS queries are visible to your ISP and anyone on the network'))
-            fixes.append('Enable DNS-over-HTTPS: install systemd-resolved with DoH, or use NextDNS')
+        # Using resolvectl and parsing in Python
+        dns_out, _, _ = run(["resolvectl", "status"])
+        if dns_out:
+            if '8.8.8.8' in dns_out or '1.1.1.1' in dns_out:
+                vulns.append(('MED', 'Using plain DNS (not encrypted)',
+                            'DNS queries are visible to your ISP and anyone on the network'))
+                fixes.append('Enable DNS-over-HTTPS: install systemd-resolved with DoH, or use NextDNS')
 
         # 5. Check for running services
-        svc_out, _, _ = run("ss -tlnp 2>/dev/null | grep -v '127.0.0.1' | grep -v '::1'")
-        exposed = re.findall(r':(\d+)\s', svc_out)
-        if len(exposed) > 5:
-            vulns.append(('MED', f'{len(exposed)} ports exposed on network interfaces',
-                          'Reduce attack surface by closing unused services'))
-            fixes.append('Audit services: systemctl list-units --type=service --state=running')
+        # Filter 127.0.0.1 and ::1 in Python
+        svc_out, _, _ = run(["ss", "-tlnp"])
+        if svc_out:
+            lines = [l for l in svc_out.split('\n') if '127.0.0.1' not in l and '::1' not in l]
+            exposed = []
+            for line in lines:
+                m = re.search(r':(\d+)\s', line)
+                if m: exposed.append(m.group(1))
+            
+            if len(exposed) > 5:
+                vulns.append(('MED', f'{len(exposed)} ports exposed on network interfaces',
+                            'Reduce attack surface by closing unused services'))
+                fixes.append('Audit services: systemctl list-units --type=service --state=running')
 
         # 6. Wireless encryption
-        wifi_out, _, _ = run("nmcli -t -f ACTIVE,SECURITY dev wifi 2>/dev/null | grep yes")
-        if 'WEP' in wifi_out:
-            vulns.append(('HIGH', 'Connected to WEP-encrypted network',
-                          'WEP is completely broken and provides no real security'))
-            fixes.append('Connect to WPA2 or WPA3 network instead')
+        # Filter active in Python
+        wifi_raw, _, _ = run(["nmcli", "-t", "-f", "ACTIVE,SECURITY", "dev", "wifi"])
+        if wifi_raw:
+            active_wifi = [l for l in wifi_raw.split('\n') if l.startswith('yes:')]
+            if active_wifi and 'WEP' in active_wifi[0]:
+                vulns.append(('HIGH', 'Connected to WEP-encrypted network',
+                            'WEP is completely broken and provides no real security'))
+                fixes.append('Connect to WPA2 or WPA3 network instead')
 
         if not vulns:
             vulns.append(('OK', '✓ No critical vulnerabilities found',
@@ -667,8 +690,17 @@ class NetScanScreen(ctk.CTkFrame):
             variant='success', width=260).pack(pady=10)
 
     def _export_report(self, vulns, fixes):
-        ip_out, _, _ = run("ip route | grep default | awk '{print $3}'")
-        gateway = ip_out.strip() or "Network"
+        # Safe gateway detection
+        route_out, _, _ = run(["ip", "route"])
+        gateway = "Network"
+        if route_out:
+            for line in route_out.split('\n'):
+                if 'default' in line:
+                    parts = line.split()
+                    if 'via' in parts:
+                        gateway = parts[parts.index('via') + 1]
+                    break
+        
         sections = [
             ("VULNERABILITIES FOUND", [f"[{v[0]}] {v[1]} - {v[2]}" for v in vulns], "WARN"),
             ("RECOMMENDED FIXES", fixes, "INFO")

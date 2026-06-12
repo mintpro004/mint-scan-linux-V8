@@ -45,12 +45,12 @@ def install_service() -> tuple[bool, str]:
         tmp = '/tmp/mint-scan.service'
         with open(tmp, 'w') as f:
             f.write(content)
-        out, err, rc = _rc(f'sudo cp {tmp} {UNIT_FILE}', timeout=10)
+        out, err, rc = _rc(['sudo', 'cp', tmp, UNIT_FILE], timeout=10)
         if rc != 0:
             return False, err or out or f'exit={rc}'
-        _rc('sudo systemctl daemon-reload', timeout=10)
-        _rc(f'sudo systemctl enable {UNIT_NAME}', timeout=10)
-        _rc(f'sudo systemctl start {UNIT_NAME}', timeout=10)
+        _rc(['sudo', 'systemctl', 'daemon-reload'], timeout=10)
+        _rc(['sudo', 'systemctl', 'enable', UNIT_NAME], timeout=10)
+        _rc(['sudo', 'systemctl', 'start', UNIT_NAME], timeout=10)
         log.info('Daemon service installed and started')
         return True, f'Service installed: {UNIT_FILE}'
     except Exception as e:
@@ -60,10 +60,10 @@ def install_service() -> tuple[bool, str]:
 def uninstall_service() -> tuple[bool, str]:
     from utils import run_cmd as _rc
     try:
-        _rc(f'sudo systemctl stop {UNIT_NAME}', timeout=10)
-        _rc(f'sudo systemctl disable {UNIT_NAME}', timeout=10)
-        _rc(f'sudo rm -f {UNIT_FILE}', timeout=10)
-        _rc('sudo systemctl daemon-reload', timeout=10)
+        _rc(['sudo', 'systemctl', 'stop', UNIT_NAME], timeout=10)
+        _rc(['sudo', 'systemctl', 'disable', UNIT_NAME], timeout=10)
+        _rc(['sudo', 'rm', '-f', UNIT_FILE], timeout=10)
+        _rc(['sudo', 'systemctl', 'daemon-reload'], timeout=10)
         log.info('Daemon service removed')
         return True, 'Service removed'
     except Exception as e:
@@ -73,12 +73,12 @@ def uninstall_service() -> tuple[bool, str]:
 def service_status() -> dict:
     """Return dict with status info."""
     r = subprocess.run(
-        f'systemctl is-active {UNIT_NAME} 2>/dev/null',
-        shell=True, capture_output=True, text=True)
+        ['systemctl', 'is-active', UNIT_NAME],
+        shell=False, capture_output=True, text=True)
     active = r.stdout.strip() == 'active'
     r2 = subprocess.run(
-        f'systemctl is-enabled {UNIT_NAME} 2>/dev/null',
-        shell=True, capture_output=True, text=True)
+        ['systemctl', 'is-enabled', UNIT_NAME],
+        shell=False, capture_output=True, text=True)
     enabled = r2.stdout.strip() == 'enabled'
     return {'active': active, 'enabled': enabled,
             'unit_exists': os.path.exists(UNIT_FILE)}

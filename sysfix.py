@@ -56,6 +56,7 @@ class SysFixScreen(ctk.CTkFrame):
         self.scroll = ScrollableFrame(self)
         self.scroll.pack(fill='both', expand=True)
         body = self.scroll
+        self.results_frame = body
 
         # Quick action buttons
         SectionHeader(body, '01', 'QUICK FIXES').pack(fill='x', padx=14, pady=(14,4))
@@ -64,7 +65,7 @@ class SysFixScreen(ctk.CTkFrame):
 
         from utils import _is_crostini
         if _is_crostini():
-            cb_card = ctk.CTkFrame(qf, fg_color=C['s3'], corner_radius=6)
+            cb_card = ctk.CTkFrame(qf, fg_color=C['s2'], corner_radius=6)
             cb_card.pack(fill='x', padx=8, pady=8)
             ctk.CTkLabel(cb_card, text="CHROMEBOOK AUTO-CONFIG", font=('Courier', 10, 'bold'), text_color=C['ac']).pack(anchor='w', padx=10, pady=(5,0))
             ctk.CTkLabel(cb_card, text="Optimize Linux container for security auditing.", font=('Courier', 9), text_color=C['tx']).pack(anchor='w', padx=10)

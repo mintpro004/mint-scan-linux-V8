@@ -26,15 +26,16 @@ def register_toast(fn):
 
 def _send_desktop(title: str, msg: str, urgency: str = 'critical'):
     """Send OS-level desktop notification."""
+    import shutil
     icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.png')
-    icon_arg = f'--icon={icon}' if os.path.exists(icon) else ''
-
+    
     # Method 1: notify-send (most reliable on Linux)
-    if subprocess.run('which notify-send', shell=True,
-                      capture_output=True).returncode == 0:
-        cmd = (f'notify-send {icon_arg} --urgency={urgency} '
-               f'--app-name="Mint Scan v11.1" "{title}" "{msg}"')
-        subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL,
+    if shutil.which('notify-send'):
+        cmd = ['notify-send', '--app-name=Mint Scan v11.1', f'--urgency={urgency}', title, msg]
+        if os.path.exists(icon):
+            cmd.insert(1, f'--icon={icon}')
+            
+        subprocess.Popen(cmd, shell=False, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL)
         return
 
@@ -150,29 +151,34 @@ def _check_threats(run_cmd, get_open_ports):
                      f'Port {num} ({DANGER[num]}) is open on this machine!')
 
     # 2. UFW disabled
-    ufw, _, rc = run_cmd('ufw status 2>/dev/null | head -1')
-    if rc == 0 and 'inactive' in ufw.lower():
-        warning('⚠ Firewall Inactive',
-                'UFW firewall is disabled. Your system is exposed.')
+    ufw_raw, _, rc = run_cmd(['sudo', 'ufw', 'status'])
+    if rc == 0 and ufw_raw:
+        if 'inactive' in ufw_raw.lower():
+            warning('⚠ Firewall Inactive',
+                    'UFW firewall is disabled. Your system is exposed.')
 
     # 3. Failed SSH logins
-    ssh_fail, _, _ = run_cmd(
-        "journalctl -u ssh --since '5 minutes ago' 2>/dev/null "
-        "| grep -c 'Failed password' || echo 0")
-    try:
-        n = int(ssh_fail.strip())
-    except Exception:
-        n = 0
-    if n >= 5:
-        critical('🔐 SSH Brute Force',
-                 f'{n} failed SSH login attempts in last 5 minutes!')
+    # Use journalctl -u ssh and count in Python
+    ssh_out, _, _ = run_cmd(['journalctl', '-u', 'ssh', '--since', '5 minutes ago'])
+    if ssh_out:
+        import re
+        n = len(re.findall(r'Failed password', ssh_out))
+        if n >= 5:
+            critical('🔐 SSH Brute Force',
+                     f'{n} failed SSH login attempts in last 5 minutes!')
 
     # 4. Disk nearly full
-    df_out, _, _ = run_cmd("df / --output=pcent | tail -1")
-    try:
-        pct = int(df_out.strip().replace('%', ''))
-        if pct >= 90:
-            warning('💾 Disk Almost Full', f'Root partition is {pct}% full.')
-    except Exception:
-        pass
+    df_out, _, _ = run_cmd(['df', '/'])
+    if df_out:
+        try:
+            import re
+            # Parse second line
+            line = df_out.splitlines()[1]
+            pct_m = re.search(r'(\d+)%', line)
+            if pct_m:
+                pct = int(pct_m.group(1))
+                if pct >= 90:
+                    warning('💾 Disk Almost Full', f'Root partition is {pct}% full.')
+        except Exception:
+            pass
 

@@ -1,4 +1,4 @@
-"""Shared utilities and real data collectors for Mint Scan Linux"""
+"""Shared utilities and real data collectors for Mint Scan"""
 import subprocess
 import socket
 import os
@@ -7,12 +7,48 @@ import json
 import threading
 import time
 import shutil
+import platform
+import psutil
 from logger import get_logger as _get_logger
 _log = _get_logger("utils")
 
 # Import colours and fonts from widgets (single source of truth)
 from widgets import C, MONO, MONO_SM, MONO_LG, MONO_XL
 
+IS_LINUX = platform.system() == 'Linux'
+IS_WINDOWS = platform.system() == 'Windows'
+
+def is_admin():
+    """Check if current process has administrative privileges."""
+    if IS_WINDOWS:
+        try:
+            import ctypes
+            return ctypes.windll.shell32.IsUserAnAdmin() != 0
+        except:
+            return False
+    else:
+        try:
+            return os.getuid() == 0
+        except:
+            return False
+
+def get_uid():
+    """Get UID, returning 0 for admin on Windows or real UID on Linux."""
+    if IS_WINDOWS:
+        return 0 if is_admin() else 1000
+    try:
+        return os.getuid()
+    except:
+        return 1000
+
+def get_gid():
+    """Get GID, returning 0 on Windows or real GID on Linux."""
+    if IS_WINDOWS:
+        return 0
+    try:
+        return os.getgid()
+    except:
+        return 1000
 
 _SUDO_AVAILABLE = True
 
@@ -25,33 +61,40 @@ def run_cmd(cmd, timeout=8):
     Returns: (stdout, stderr, returncode)
     """
     global _SUDO_AVAILABLE
-    original_cmd = cmd if isinstance(cmd, str) else " ".join(cmd)
     is_shell = isinstance(cmd, str)
+    original_cmd = cmd if is_shell else " ".join(cmd)
+
+    if is_shell:
+        _log.warning(f"Insecure shell=True used for: {cmd}")
 
     # Elevation handling
-    if os.getuid() != 0:
+    uid = get_uid()
+    if uid != 0:
         if is_shell and cmd.strip().startswith('sudo '):
-            inner = cmd.strip()[5:].strip()
-            inner_q = inner.replace("'", "'\\''")
-            # In Crostini/Chromebook, sudo -n often works. On others, it might fail.
-            # We try to use sudo -n only if we've already confirmed it works elsewhere or just try it.
-            if _SUDO_AVAILABLE:
-                cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || bash -c '{inner_q}'"
+            if IS_WINDOWS:
+                # On Windows, just strip sudo
+                cmd = cmd.strip()[5:].strip()
             else:
-                cmd = f"bash -c '{inner_q}'"
+                inner = cmd.strip()[5:].strip()
+                inner_q = inner.replace("'", "'\\''")
+                if _SUDO_AVAILABLE:
+                    cmd = f"sudo -n bash -c '{inner_q}' 2>/dev/null || bash -c '{inner_q}'"
+                else:
+                    cmd = f"bash -c '{inner_q}'"
         elif not is_shell and cmd[0] == 'sudo':
-            # For lists, we try with -n but handle failure
+            # For lists, we'll handle sudo -n during actual execution logic below
             pass
 
-    run_env = {**os.environ,
-               'DEBIAN_FRONTEND': 'noninteractive',
-               'SUDO_ASKPASS': '/bin/false'}
+    run_env = {**os.environ}
+    if IS_LINUX:
+        run_env['DEBIAN_FRONTEND'] = 'noninteractive'
+        run_env['SUDO_ASKPASS'] = '/bin/false'
 
     try:
-        # If we use a list and sudo, and we aren't root, try -n
         actual_cmd = cmd
-        if not is_shell and cmd[0] == 'sudo' and os.getuid() != 0:
-             if _SUDO_AVAILABLE:
+        # If we use a list and sudo, and we aren't root, try -n
+        if not is_shell and cmd[0] == 'sudo' and uid != 0:
+             if IS_LINUX and _SUDO_AVAILABLE:
                  try:
                      r = subprocess.run(['sudo', '-n'] + cmd[1:], capture_output=True, text=True, timeout=timeout, env=run_env)
                      if r.returncode == 0:
@@ -60,7 +103,9 @@ def run_cmd(cmd, timeout=8):
                          _SUDO_AVAILABLE = False
                  except:
                      pass
-             actual_cmd = cmd[1:]
+             actual_cmd = cmd if IS_WINDOWS else cmd[1:]
+             if IS_WINDOWS and actual_cmd[0] == 'sudo':
+                 actual_cmd = actual_cmd[1:]
 
         r = subprocess.run(
             actual_cmd, shell=is_shell, capture_output=True,
@@ -70,7 +115,7 @@ def run_cmd(cmd, timeout=8):
         stderr = r.stderr.strip() if r.stderr else ""
         
         # Check if we failed due to sudo permissions in a shell command
-        if is_shell and "sudo: a password is required" in stderr.lower():
+        if IS_LINUX and is_shell and "sudo: a password is required" in stderr.lower():
             _SUDO_AVAILABLE = False
             # Re-run without sudo if it was prefixed with sudo
             if original_cmd.strip().startswith('sudo '):
@@ -132,7 +177,7 @@ def get_hostname():
 
 def ping(host='1.1.1.1', count=1):
     """Real ICMP ping — returns avg ms or None."""
-    out, _, rc = run_cmd(f'ping -c {count} -W 2 {host}')
+    out, _, rc = run_cmd(['ping', '-c', str(count), '-W', '2', host])
     if rc == 0:
         m = re.search(r'avg.*?([\d.]+)', out)
         if m:
@@ -176,6 +221,7 @@ def get_from_clipboard():
 
 # ── Chromebook / Crostini detection ──────────────────────────────────────────
 def _is_crostini() -> bool:
+    if not IS_LINUX: return False
     try:
         with open('/proc/version') as f:
             v = f.read().lower()
@@ -209,7 +255,7 @@ def _crostini_wifi_info() -> dict:
     iface = result.get('interface')
     if iface:
         try:
-            out, _, _ = run_cmd(f'iw {iface} info 2>/dev/null', timeout=4)
+            out, _, _ = run_cmd(['iw', iface, 'info'], timeout=4)
             m = re.search(r'ssid (.+)', out or '')
             if m:
                 result['ssid'] = m.group(1).strip()
@@ -217,10 +263,10 @@ def _crostini_wifi_info() -> dict:
             pass
     if not result['ssid']:
         try:
-            out, _, rc = run_cmd(
-                "gdbus call --system --dest org.chromium.flimflam "
-                "--object-path / --method org.chromium.flimflam.Manager.GetProperties 2>/dev/null",
-                timeout=4)
+            out, _, rc = run_cmd([
+                'gdbus', 'call', '--system', '--dest', 'org.chromium.flimflam',
+                '--object-path', '/', '--method', 'org.chromium.flimflam.Manager.GetProperties'
+            ], timeout=4)
             if rc == 0 and out:
                 m = re.search(r"'Name'.*?'([^']+)'", out)
                 if m:
@@ -270,23 +316,20 @@ def get_wifi_networks():
         return networks
 
     # Trigger a rescan — ignore errors (requires admin on some systems)
-    run_cmd("nmcli device wifi rescan 2>/dev/null", timeout=6)
+    run_cmd(["nmcli", "device", "wifi", "rescan"], timeout=6)
     time.sleep(1)  # give driver a moment to populate results
 
     # Use --escape no so BSSIDs (aa:bb:…) are not backslash-escaped,
     # and separate fields with a unique delimiter that never appears in SSIDs.
-    DELIM = '\x00'
-    cmd = (f"nmcli --escape no -g SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ "
-           f"device wifi list 2>/dev/null")
+    cmd = ["nmcli", "--escape", "no", "-g", "SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ", "device", "wifi", "list"]
     out, _, rc = run_cmd(cmd, timeout=10)
 
     # If failed, retry with explicit device
     if rc != 0 or not out.strip():
         iface = get_wifi_interface()
         if iface:
-            out, _, rc = run_cmd(
-                f"nmcli --escape no -g SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ "
-                f"device wifi list ifname {iface} 2>/dev/null", timeout=10)
+            cmd = ["nmcli", "--escape", "no", "-g", "SSID,BSSID,SIGNAL,SECURITY,CHAN,FREQ", "device", "wifi", "list", "ifname", iface]
+            out, _, rc = run_cmd(cmd, timeout=10)
 
     if rc == 0 and out.strip():
         for line in out.strip().split('\n'):
@@ -333,9 +376,9 @@ def get_wifi_networks():
     # ── Fallback: iwlist scan ─────────────────────────────────────
     iface = get_wifi_interface()
     if iface:
-        out, _, rc = run_cmd(f'iwlist {iface} scan 2>/dev/null', timeout=10)
+        out, _, rc = run_cmd(['iwlist', iface, 'scan'], timeout=10)
         if rc != 0:
-            out, _, rc = run_cmd(f'sudo iwlist {iface} scan 2>/dev/null', timeout=10)
+            out, _, rc = run_cmd(['sudo', 'iwlist', iface, 'scan'], timeout=10)
         if rc == 0 and 'ESSID' in out:
             for cell in out.split('Cell ')[1:]:
                 ssid_m   = re.search(r'ESSID:"([^"]*)"', cell)
@@ -355,7 +398,7 @@ def get_wifi_networks():
 
     # ── Last resort: iw scan ──────────────────────────────────────
     if not networks and iface:
-        out, _, rc = run_cmd(f'sudo iw {iface} scan 2>/dev/null', timeout=12)
+        out, _, rc = run_cmd(['sudo', 'iw', iface, 'scan'], timeout=12)
         if rc == 0 and out:
             cur: dict = {}
             for line in out.split('\n'):
@@ -415,8 +458,9 @@ def get_current_wifi():
         info = _crostini_wifi_info()
         return info.get('ssid') or '(Chrome OS Wi-Fi — managed by Chrome OS)'
     # Method 1: nmcli active connection
-    out, _, rc = run_cmd(
-        "nmcli -t -f NAME,TYPE,DEVICE,STATE connection show --active 2>/dev/null")
+    out, _, rc = run_cmd([
+        'nmcli', '-t', '-f', 'NAME,TYPE,DEVICE,STATE', 'connection', 'show', '--active'
+    ])
     for line in out.split('\n'):
         lo = line.lower()
         if 'wifi' in lo or '802-11' in lo or 'wireless' in lo:
@@ -424,21 +468,22 @@ def get_current_wifi():
             if name:
                 return name
     # Method 2: nmcli device active SSID
-    out, _, rc = run_cmd(
-        "nmcli -t -f ACTIVE,SSID device wifi list 2>/dev/null")
+    out, _, rc = run_cmd([
+        'nmcli', '-t', '-f', 'ACTIVE,SSID', 'device', 'wifi', 'list'
+    ])
     for line in out.split('\n'):
         if line.startswith('yes:') or line.startswith('*:'):
             ssid = line.split(':', 1)[1].strip()
             if ssid:
                 return ssid
     # Method 3: iwgetid
-    out, _, rc = run_cmd('iwgetid -r 2>/dev/null')
+    out, _, rc = run_cmd(['iwgetid', '-r'])
     if rc == 0 and out.strip():
         return out.strip()
     # Method 4: iw dev
     iface = get_wifi_interface()
     if iface:
-        out, _, _ = run_cmd(f'iw {iface} info 2>/dev/null')
+        out, _, _ = run_cmd(['iw', iface, 'info'], timeout=4)
         m = re.search(r'ssid (.+)', out)
         if m:
             return m.group(1).strip()
@@ -453,9 +498,9 @@ def get_saved_wifi_networks():
     saved = []
 
     # Method 1: nmcli connection show (lists all profiles)
-    out, _, rc = run_cmd(
-        "nmcli -t -f NAME,TYPE,TIMESTAMP-REAL connection show 2>/dev/null",
-        timeout=8)
+    out, _, rc = run_cmd([
+        'nmcli', '-t', '-f', 'NAME,TYPE,TIMESTAMP-REAL', 'connection', 'show'
+    ], timeout=8)
     if rc == 0 and out:
         for line in out.split('\n'):
             line = line.strip()
@@ -504,7 +549,7 @@ def get_network_interfaces():
             mac   = addrs.get(netifaces.AF_LINK,  [{}])[0].get('addr', '—')
             ifaces.append({'name': iface, 'ip4': ip4, 'ip6': ip6, 'mac': mac})
     except ImportError:
-        out, _, _ = run_cmd('ip addr show 2>/dev/null')
+        out, _, _ = run_cmd(['ip', 'addr', 'show'])
         current = None
         for line in out.split('\n'):
             m = re.match(r'\d+: (\S+):', line)
@@ -520,49 +565,51 @@ def get_network_interfaces():
 
 
 def get_battery_info():
-    """Read real battery info from /sys/class/power_supply."""
-    base = '/sys/class/power_supply'
-    if not os.path.exists(base):
-        return None
+    """Read real battery info using psutil."""
+    import psutil
     try:
-        for name in os.listdir(base):
-            path = os.path.join(base, name)
-            try:
+        batt = psutil.sensors_battery()
+        if batt is None:
+            # Fallback for Linux /sys/class/power_supply
+            base = '/sys/class/power_supply'
+            if not os.path.exists(base): return None
+            for name in os.listdir(base):
+                path = os.path.join(base, name)
                 type_path = os.path.join(path, 'type')
                 if not os.path.exists(type_path): continue
-                ptype = open(type_path).read().strip()
-                if ptype == 'Battery':
+                if open(type_path).read().strip() == 'Battery':
                     def r(f):
                         fp = os.path.join(path, f)
-                        try:
-                            return open(fp).read().strip() if os.path.exists(fp) else None
-                        except: return None
-                    cap     = r('capacity')
-                    status  = r('status')
-                    health  = r('health')
-                    tech    = r('technology')
-                    voltage = r('voltage_now')
-                    current = r('current_now')
-                    cycles  = r('cycle_count')
+                        return open(fp).read().strip() if os.path.exists(fp) else None
+                    cap = r('capacity')
                     return {
                         'level':   int(cap) if cap and cap.isdigit() else 0,
-                        'status':  status or 'Unknown',
-                        'health':  health or 'Unknown',
-                        'tech':    tech or 'Unknown',
-                        'voltage': f"{int(voltage)/1e6:.2f}V" if voltage and voltage.isdigit() else '—',
-                        'current': f"{abs(int(current))/1e6:.2f}A" if current and current.replace('-','').isdigit() else '—',
-                        'cycles':  cycles or '—',
+                        'status':  r('status') or 'Unknown',
+                        'health':  r('health') or 'Good',
+                        'tech':    r('technology') or 'Li-ion',
+                        'voltage': f"{int(r('voltage_now') or 0)/1e6:.2f}V" if r('voltage_now') else '—',
+                        'current': f"{abs(int(r('current_now') or 0))/1e6:.2f}A" if r('current_now') else '—',
+                        'cycles':  r('cycle_count') or '—',
                     }
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return None
+            return None
+            
+        return {
+            'level':   int(batt.percent),
+            'status':  'Charging' if batt.power_plugged else ('Discharging' if batt.percent < 100 else 'Full'),
+            'health':  'Good',
+            'tech':    'Li-ion',
+            'voltage': '—',
+            'current': '—',
+            'cycles':  '—',
+        }
+    except:
+        return None
 
 
 def get_system_info():
-    """Collect real system information."""
+    """Collect real system information using psutil and platform."""
     import platform
+    import psutil
     info = {}
     info['os']       = platform.system()
     info['os_ver']   = platform.version()
@@ -570,86 +617,119 @@ def get_system_info():
     info['machine']  = platform.machine()
     info['arch']     = platform.architecture()[0]
     info['hostname'] = get_hostname()
-    info['kernel']   = run_cmd('uname -r')[0]
-    info['cpu_model']= run_cmd("grep 'model name' /proc/cpuinfo | head -1 | cut -d: -f2")[0].strip()
-    info['cpu_cores']= run_cmd("nproc")[0]
-    mem_out = run_cmd("free -h | grep Mem")[0]
-    if mem_out:
-        parts = mem_out.split()
-        if len(parts) >= 3:
-            info['ram_total'] = parts[1]
-            info['ram_used']  = parts[2]
-            info['ram_free']  = parts[3] if len(parts) > 3 else '—'
-    info['uptime'] = run_cmd("uptime -p")[0]
-    disk_out = run_cmd("df -h / | tail -1")[0]
-    if disk_out:
-        parts = disk_out.split()
-        if len(parts) >= 5:
-            info['disk_total'] = parts[1]
-            info['disk_used']  = parts[2]
-            info['disk_free']  = parts[3]
-            info['disk_pct']   = parts[4]
-    info['gpu'] = run_cmd("lspci 2>/dev/null | grep -i 'vga\\|3d\\|2d' | head -1 | cut -d: -f3")[0].strip() or '—'
+    
+    if IS_LINUX:
+        info['kernel'] = run_cmd(['uname', '-r'])[0] or platform.release()
+    else:
+        info['kernel'] = platform.release()
+
+    # CPU Model
+    if IS_LINUX:
+        cpu_out, _, _ = run_cmd(['grep', 'model name', '/proc/cpuinfo'])
+        if cpu_out:
+            info['cpu_model'] = cpu_out.split('\n')[0].split(':', 1)[1].strip()
+        else:
+            info['cpu_model'] = platform.processor() or '—'
+    else:
+        info['cpu_model'] = platform.processor() or '—'
+        
+    cores_phys = psutil.cpu_count(logical=False)
+    cores_log  = psutil.cpu_count(logical=True)
+    info['cpu_cores'] = f"{cores_phys} ({cores_log} logical)"
+    
+    # Memory
+    mem = psutil.virtual_memory()
+    info['ram_total'] = f"{mem.total / (1024**3):.1f} GB"
+    info['ram_used']  = f"{mem.used / (1024**3):.1f} GB"
+    info['ram_free']  = f"{mem.available / (1024**3):.1f} GB"
+    
+    # Uptime
+    try:
+        uptime_sec = time.time() - psutil.boot_time()
+        h = int(uptime_sec // 3600)
+        m = int((uptime_sec % 3600) // 60)
+        info['uptime'] = f"{h}h {m}m"
+    except:
+        info['uptime'] = '—'
+    
+    # Disk
+    try:
+        usage = psutil.disk_usage('/')
+        info['disk_total'] = f"{usage.total / (1024**3):.1f} GB"
+        info['disk_used']  = f"{usage.used / (1024**3):.1f} GB"
+        info['disk_free']  = f"{usage.free / (1024**3):.1f} GB"
+        info['disk_pct']   = f"{usage.percent}%"
+    except:
+        info['disk_total'] = info['disk_used'] = info['disk_free'] = info['disk_pct'] = '—'
+            
+    # GPU
+    if IS_LINUX:
+        gpu_out, _, _ = run_cmd(['lspci'])
+        if gpu_out:
+            for line in gpu_out.split('\n'):
+                if any(x in line.lower() for x in ['vga', '3d', '2d']):
+                    info['gpu'] = line.split(':', 2)[-1].strip()
+                    break
+            else: info['gpu'] = '—'
+        else: info['gpu'] = '—'
+    elif IS_WINDOWS:
+        try:
+            out, _, _ = run_cmd('wmic path win32_VideoController get name')
+            lines = [l.strip() for l in out.split('\n') if l.strip() and 'Name' not in l]
+            info['gpu'] = lines[0] if lines else '—'
+        except:
+            info['gpu'] = '—'
+    else:
+        info['gpu'] = '—'
+        
     return info
 
 
 def get_processes(top_n=20):
-    """Get top processes by CPU usage."""
+    """Get top processes by CPU usage using psutil."""
+    import psutil
+    procs = []
     try:
-        out, _, rc = run_cmd(f"ps aux --sort=-%cpu | head -{top_n+1} 2>/dev/null")
-        if rc != 0 or not out: return []
-        procs = []
-        for line in out.strip().split('\n')[1:]:
-            parts = line.split(None, 10)
-            if len(parts) >= 11:
-                procs.append({
-                    'user':    parts[0],
-                    'pid':     parts[1],
-                    'cpu':     parts[2],
-                    'mem':     parts[3],
-                    'command': parts[10][:50],
-                })
-        return procs
+        # Sort by cpu_percent
+        for p in sorted(psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_percent']), 
+                        key=lambda x: (x.info['cpu_percent'] or 0.0), reverse=True)[:top_n]:
+            procs.append({
+                'user':    p.info['username'] or '—',
+                'pid':     str(p.info['pid']),
+                'cpu':     f"{p.info['cpu_percent'] or 0.0:.1f}",
+                'mem':     f"{p.info['memory_percent'] or 0.0:.1f}",
+                'command': p.info['name'] or '—',
+            })
     except:
-        return []
+        pass
+    return procs
 
 
 def get_open_ports():
-    """List open TCP/UDP ports using ss."""
+    """List open TCP/UDP ports using psutil."""
+    import psutil
     ports = []
-    out, _, _ = run_cmd("ss -tlnp 2>/dev/null")
-    for line in out.split('\n')[1:]:
-        parts = line.split()
-        if len(parts) >= 4:
-            local = parts[3]
-            port_m = re.search(r':(\d+)$', local)
-            if port_m:
+    try:
+        for c in psutil.net_connections(kind='inet'):
+            if c.status == 'LISTEN' or (c.type == socket.SOCK_DGRAM and c.status == 'NONE'):
+                try:
+                    pname = psutil.Process(c.pid).name() if c.pid else '—'
+                except:
+                    pname = '—'
                 ports.append({
-                    'proto':   'TCP',
-                    'state':   parts[0],
-                    'local':   local,
-                    'port':    port_m.group(1),
-                    'process': parts[5] if len(parts) > 5 else '—',
+                    'proto':   'TCP' if c.type == socket.SOCK_STREAM else 'UDP',
+                    'state':   c.status if c.status != 'NONE' else 'OPEN',
+                    'local':   f"{c.laddr.ip}:{c.laddr.port}",
+                    'port':    str(c.laddr.port),
+                    'process': f"{pname} ({c.pid})" if c.pid else '—',
                 })
-    out2, _, _ = run_cmd("ss -ulnp 2>/dev/null")
-    for line in out2.split('\n')[1:]:
-        parts = line.split()
-        if len(parts) >= 4:
-            local = parts[4] if len(parts) > 4 else parts[3]
-            port_m = re.search(r':(\d+)$', local)
-            if port_m:
-                ports.append({
-                    'proto':   'UDP',
-                    'state':   'LISTENING',
-                    'local':   local,
-                    'port':    port_m.group(1),
-                    'process': parts[5] if len(parts) > 5 else '—',
-                })
+    except:
+        pass
     return ports
 
 
 def check_root():
-    return os.geteuid() == 0
+    return get_uid() == 0
 
 
 def get_dependencies_status():
@@ -704,13 +784,12 @@ def install_missing_dependencies():
     for cmd in missing:
         to_install.append(pkg_map.get(cmd, cmd))
     
-    pkgs = " ".join(to_install)
     if pm == 'apt':
-        cmd = f"sudo DEBIAN_FRONTEND=noninteractive apt-get install -y {pkgs}"
+        cmd = ["sudo", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y"] + to_install
     elif pm == 'dnf':
-        cmd = f"sudo dnf install -y {pkgs}"
+        cmd = ["sudo", "dnf", "install", "-y"] + to_install
     elif pm == 'pacman':
-        cmd = f"sudo pacman -S --noconfirm --needed {pkgs}"
+        cmd = ["sudo", "pacman", "-S", "--noconfirm", "--needed"] + to_install
         
     out, err, rc = run_cmd(cmd, timeout=300)
     return rc == 0, out or err
@@ -718,16 +797,17 @@ def install_missing_dependencies():
 
 def get_active_connections():
     """Get active network connections."""
-    out, _, _ = run_cmd("ss -tnp state established 2>/dev/null")
+    out, _, _ = run_cmd(["ss", "-tnp", "state", "established"])
     conns = []
-    for line in out.split('\n')[1:]:
-        parts = line.split()
-        if len(parts) >= 5:
-            conns.append({
-                'local':   parts[3],
-                'remote':  parts[4],
-                'process': parts[5] if len(parts) > 5 else '—',
-            })
+    if out:
+        for line in out.split('\n')[1:]:
+            parts = line.split()
+            if len(parts) >= 5:
+                conns.append({
+                    'local':   parts[3],
+                    'remote':  parts[4],
+                    'process': parts[5] if len(parts) > 5 else '—',
+                })
     return conns
 
 

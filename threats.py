@@ -208,8 +208,8 @@ class ThreatsScreen(ctk.CTkFrame):
             return True
 
         if not chk("Checking privileges...", 0.08): return
-        import os
-        if os.geteuid() == 0:
+        from utils import get_uid
+        if get_uid() == 0:
             findings.append(('HIGH','Running as root — elevated risk',
                 'Use a regular user account for daily operations.',
                 [("VIEW ADVICE",'warning',

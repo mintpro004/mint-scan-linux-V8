@@ -27,7 +27,7 @@ class ReportGenerator:
     # ── MARKDOWN ─────────────────────────────────────────────────
     def generate_markdown(self) -> str:
         lines = [
-            "# MINT SCAN v8 — SECURITY REPORT",
+            "# MINT SCAN v11.1 — SECURITY REPORT",
             f"**Type:** {self.type}",
             f"**Target:** {self.target}",
             f"**Generated:** {self.timestamp}",
@@ -105,7 +105,7 @@ class ReportGenerator:
 </style>
 </head>
 <body>
-<h1>[ MINT SCAN ] v8 — {self.type}</h1>
+<h1>[ MINT SCAN ] v11.1 — {self.type}</h1>
 <div class="meta">
   Target: <b>{self.target}</b> &nbsp;|&nbsp;
   Generated: <b>{self.timestamp}</b> &nbsp;|&nbsp;
@@ -165,7 +165,7 @@ class ReportGenerator:
             }
 
             elems = [
-                Paragraph("[ MINT SCAN ] v8 — Security Report", title_style),
+                Paragraph("[ MINT SCAN ] v11.1 — Security Report", title_style),
                 Paragraph(
                     f"Type: <b>{self.type}</b> &nbsp;|&nbsp; "
                     f"Target: <b>{self.target}</b> &nbsp;|&nbsp; "
@@ -218,8 +218,8 @@ class ReportGenerator:
             with open(html_tmp, 'w') as f:
                 f.write(self.generate_html())
             r = subprocess.run(
-                f'wkhtmltopdf --quiet "{html_tmp}" "{out_path}"',
-                shell=True, capture_output=True, timeout=30)
+                ['wkhtmltopdf', '--quiet', html_tmp, out_path],
+                shell=False, capture_output=True, timeout=30)
             try:
                 os.remove(html_tmp)
             except Exception:

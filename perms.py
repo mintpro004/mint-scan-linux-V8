@@ -3,7 +3,7 @@ from widgets import C, MONO, MONO_SM, ScrollableFrame, Card, SectionHeader, Info
 import tkinter as tk
 import customtkinter as ctk
 import threading, os, stat
-from utils import run_cmd, check_root
+from utils import run_cmd, check_root, get_uid, get_gid
 
 
 class PermsScreen(ctk.CTkFrame):
@@ -71,8 +71,8 @@ class PermsScreen(ctk.CTkFrame):
 
         # User info
         results['user'] = run_cmd('whoami')[0]
-        results['uid']  = str(os.getuid())
-        results['gid']  = str(os.getgid())
+        results['uid']  = str(get_uid())
+        results['gid']  = str(get_gid())
         results['groups'] = run_cmd('groups')[0]
         results['is_root'] = check_root()
         results['sudo_access'] = run_cmd('sudo -n true 2>/dev/null && echo yes || echo no')[0] == 'yes'

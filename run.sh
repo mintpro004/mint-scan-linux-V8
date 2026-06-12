@@ -85,5 +85,5 @@ if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
     }
 fi
 
-echo -e "${GREEN}[ MINT SCAN ]${NC} Launching v8..."
+echo -e "${GREEN}[ MINT SCAN ]${NC} Launching v11.1..."
 exec python3 main.py "$@"

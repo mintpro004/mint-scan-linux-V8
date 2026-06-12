@@ -13,6 +13,7 @@ import customtkinter as ctk
 from widgets import C, MONO, MONO_SM, Btn, ScrollableFrame, Card, FONT
 from logger import get_logger
 from database import db
+from utils import IS_WINDOWS, IS_LINUX
 
 log = get_logger('terminal')
 
@@ -37,9 +38,13 @@ class TerminalScreen(ctk.CTkFrame):
         self._lock = threading.Lock()
         
         # System Context
+        import socket
         try:
-            self._user = os.getlogin()
-            self._host = os.uname()[1]
+            if IS_WINDOWS:
+                self._user = os.environ.get('USERNAME', 'user')
+            else:
+                self._user = os.getlogin() if hasattr(os, 'getlogin') else "user"
+            self._host = socket.gethostname()
         except:
             self._user = "user"
             self._host = "mint-scan"
@@ -326,10 +331,10 @@ class TerminalScreen(ctk.CTkFrame):
             self._status_lbl.configure(text='RUNNING', text_color=C['am'])
             env = os.environ.copy()
             env['TERM'] = 'xterm-256color'
-            self._proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, 
-                                          stderr=subprocess.STDOUT, text=True, 
-                                          cwd=self._cwd, env=env, preexec_fn=os.setsid)
-            
+            self._proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+                                          stderr=subprocess.STDOUT, text=True,
+                                          cwd=self._cwd, env=env, 
+                                          preexec_fn=os.setsid if hasattr(os, 'setsid') else None)
             buffer = []
             last_update = time.time()
             
@@ -360,7 +365,10 @@ class TerminalScreen(ctk.CTkFrame):
     def _kill_proc(self):
         if self._proc:
             try:
-                os.killpg(os.getpgid(self._proc.pid), signal.SIGTERM)
+                if not IS_WINDOWS and hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(self._proc.pid), signal.SIGTERM)
+                else:
+                    self._proc.terminate()
                 self._write_to_ui("\n[ TERMINATED ]\n")
             except: pass
             self._running = False

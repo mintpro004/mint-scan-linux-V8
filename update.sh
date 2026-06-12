@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔══════════════════════════════════════════════════════════════╗
-# ║   MINT SCAN v8 — UPDATER  (git pull only)                   ║
+# ║   MINT SCAN v11.1 — UPDATER (git pull only)                 ║
 # ║   Repository: github.com/mintpro004/mint-scan-linux-V11      ║
 # ╚══════════════════════════════════════════════════════════════╝
 CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'

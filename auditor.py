@@ -94,14 +94,14 @@ class AuditorScreen(ctk.CTkFrame):
     def _monitor_audit(self):
         # Tail audit.log or journalctl fallback
         if os.path.exists('/var/log/audit/audit.log'):
-            cmd = "tail -f /var/log/audit/audit.log 2>/dev/null"
+            cmd = ["tail", "-f", "/var/log/audit/audit.log"]
         elif os.path.exists('/var/log/auth.log'):
-            cmd = "tail -f /var/log/auth.log 2>/dev/null"
+            cmd = ["tail", "-f", "/var/log/auth.log"]
         else:
             # Live tail from journalctl (auth messages)
-            cmd = "journalctl -t sshd -t sudo -f 2>/dev/null"
+            cmd = ["journalctl", "-t", "sshd", "-t", "sudo", "-f"]
         
-        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         while self._monitoring:
             line = proc.stdout.readline()
             if line:
@@ -118,15 +118,35 @@ class AuditorScreen(ctk.CTkFrame):
 
     def _do_log_analysis_bg(self):
         if os.path.exists('/var/log/auth.log'):
-            failed, _, _ = run("grep -c 'Failed password' /var/log/auth.log")
-            sudo_fail, _, _ = run("grep -c 'sudo:.*command not found' /var/log/auth.log")
-            root_login, _, _ = run("grep -c 'session opened for user root' /var/log/auth.log")
+            failed, _, _ = run(["grep", "-c", "Failed password", "/var/log/auth.log"])
+            sudo_fail, _, _ = run(["grep", "-c", "sudo:.*command not found", "/var/log/auth.log"])
+            root_login, _, _ = run(["grep", "-c", "session opened for user root", "/var/log/auth.log"])
         else:
             # Fallback to journalctl for systems without auth.log (e.g. Debian 12+)
-            f_out, _, _ = run("journalctl --since '24h ago' | grep -c 'Failed password' || echo 0")
-            s_out, _, _ = run("journalctl --since '24h ago' | grep -c 'sudo:.*command not found' || echo 0")
-            r_out, _, _ = run("journalctl --since '24h ago' | grep -c 'session opened for user root' || echo 0")
-            failed, sudo_fail, root_login = f_out.strip(), s_out.strip(), r_out.strip()
+            # Note: piping is complex with run_cmd, let's use list and process output in Python if needed, 
+            # or use shell for simple internal logic if we must, but here we can just run the commands.
+            # Wait, journalctl ... | grep -c ... || echo 0 is very shell-y.
+            # Let's try to do it safely.
+            def get_count(cmd_list):
+                out, _, _ = run(cmd_list)
+                try:
+                    return out.strip() if out else "0"
+                except:
+                    return "0"
+            
+            # Since run_cmd doesn't support pipes in list mode, we'd have to run journalctl and filter in Python.
+            # But that could be a lot of data.
+            # Let's see if we can use journalctl's own filtering.
+            
+            # Actually, let's just use the safer list mode for simple grep first.
+            f_out, _, _ = run(["journalctl", "--since", "24h ago", "-g", "Failed password"])
+            failed = str(len(f_out.split('\n'))) if f_out else "0"
+            
+            s_out, _, _ = run(["journalctl", "--since", "24h ago", "-g", "sudo:.*command not found"])
+            sudo_fail = str(len(s_out.split('\n'))) if s_out else "0"
+            
+            r_out, _, _ = run(["journalctl", "--since", "24h ago", "-g", "session opened for user root"])
+            root_login = str(len(r_out.split('\n'))) if r_out else "0"
         
         msg = (f"• Failed SSH/Login Attempts (24h): {failed}\n"
                f"• Failed Sudo Commands (24h): {sudo_fail}\n"

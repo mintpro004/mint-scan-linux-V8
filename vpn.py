@@ -14,15 +14,7 @@ from logger import get_logger
 log = get_logger('vpn')
 
 
-def _is_crostini() -> bool:
-    """Detect Chromebook Linux container."""
-    try:
-        with open('/proc/version') as f:
-            if 'cros' in f.read().lower():
-                return True
-    except Exception:
-        pass
-    return os.path.exists('/dev/.cros_milestone') or os.path.exists('/run/chrome')
+from utils import _is_crostini
 
 
 def find_wg_configs() -> list:

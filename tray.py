@@ -11,16 +11,7 @@ _tray_icon  = None
 _tray_ok    = False
 
 
-def _is_chromebook() -> bool:
-    try:
-        if os.path.exists('/proc/version'):
-            v = open('/proc/version').read().lower()
-            if 'cros' in v or 'chromeos' in v:
-                return True
-        import shutil
-        return bool(shutil.which('crosh'))
-    except Exception:
-        return False
+from utils import _is_crostini as _is_chromebook
 
 
 def _make_image(color_hex='#00ffe0', size=64):

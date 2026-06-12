@@ -189,6 +189,15 @@ class CVELookupScreen(ctk.CTkFrame):
         pass
 
 
+    def search_external(self, query):
+        """Programmatically trigger a search from another screen."""
+        if not self._built:
+            self._build()
+            self._built = True
+        self._q.delete(0, 'end')
+        self._q.insert(0, query)
+        self._search()
+
     def _build(self):
         hdr = ctk.CTkFrame(self, fg_color=C['sf'], height=48, corner_radius=0)
         hdr.pack(fill='x')
@@ -216,15 +225,6 @@ class CVELookupScreen(ctk.CTkFrame):
         Btn(sr, '📦 OFFLINE DB', command=self._download_db,
             variant='ghost', width=120).pack(side='left')
         self._q.bind('<Return>', lambda e: self._search())
-
-    def search_external(self, query):
-        """Programmatically trigger a search from another screen."""
-        if not self._built:
-            self._build()
-            self._built = True
-        self._q.delete(0, 'end')
-        self._q.insert(0, query)
-        self._search()
 
         # Quick searches from open ports
         SectionHeader(body, '02', 'QUICK SCAN — LOCAL SERVICES').pack(

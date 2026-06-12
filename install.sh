@@ -18,6 +18,12 @@ echo -e "${NC}"
 
 # ── [0/9] Platform / Package Manager Detection ───────────────────
 echo "[0/9] Detecting system environment..."
+# Fix ownership immediately if root-owned (common if user used 'sudo git clone')
+if [ ! -O "$SCRIPT_DIR" ] && [ "$EUID" -ne 0 ]; then
+    echo "  ⚠ Fixing directory ownership (detected root-owned files)..."
+    sudo chown -R "$USER:$USER" "$SCRIPT_DIR" 2>/dev/null || true
+fi
+
 IS_AARCH64=false; [[ "$(uname -m)" == "aarch64" || "$(uname -m)" == "arm64" ]] && IS_AARCH64=true
 IS_CHROMEBOOK=false; [ -f /proc/version ] && grep -qi "cros\|chrome" /proc/version 2>/dev/null && IS_CHROMEBOOK=true
 # Additional Chromebook detection

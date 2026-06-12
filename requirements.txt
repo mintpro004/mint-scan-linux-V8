@@ -1,4 +1,4 @@
-# Mint Scan v8 — Python dependencies
+# Mint Scan v11.1 — Python dependencies
 # System requirement: sudo apt install python3-tk
 # On aarch64 (ARM64): sudo apt install python3-tk libtk8.6
 

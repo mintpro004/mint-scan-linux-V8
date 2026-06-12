@@ -6,7 +6,7 @@ import tkinter as tk
 import customtkinter as ctk
 import threading, time, socket, subprocess, json
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from widgets import C, MONO_SM, Btn, Card, SectionHeader, InfoGrid
+from widgets import C, MONO_SM, Btn, Card, SectionHeader, InfoGrid, FONT
 from utils import get_local_ip, copy_to_clipboard
 
 def run(cmd):

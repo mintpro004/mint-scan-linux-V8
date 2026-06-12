@@ -734,17 +734,20 @@ class NetworkScreen(ctk.CTkFrame):
 
     def _do_capture(self):
         import subprocess
-        tcpdump = run_cmd(['which', 'tcpdump'])[0].strip()
+        # Get path to tcpdump safely
+        out, _, rc = run_cmd(['which', 'tcpdump'])
+        tcpdump = out.strip() if rc == 0 else None
+        
         if tcpdump:
             self.after(0, lambda: self._tlog_line("ℹ Starting packet capture via tcpdump..."))
-            cmd = f'sudo {tcpdump} -l -n -q -c 500 2>/dev/null'
+            cmd = ['sudo', '-n', tcpdump, '-l', '-n', '-q', '-c', '500']
         else:
             self.after(0, lambda: self._tlog_line("ℹ tcpdump not found. Monitoring active connections via 'ss' instead."))
-            cmd = 'ss -tnp 2>/dev/null'
+            cmd = ['ss', '-tnp']
 
         try:
             self._traffic_proc = subprocess.Popen(
-                cmd, shell=True, stdout=subprocess.PIPE,
+                cmd, shell=False, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True)
             
             count = 0
@@ -810,7 +813,7 @@ class NetworkScreen(ctk.CTkFrame):
     # ── CLIPBOARD OPS ─────────────────────────────────────────────
 
     def _select_all(self):
-        self._tlog.tag_add('sel','1.0','end')
+        self._tlog._textbox.tag_add('sel','1.0','end')
         return 'break'
 
     def _copy_selection(self):
@@ -839,10 +842,8 @@ class NetworkScreen(ctk.CTkFrame):
             txt = self.winfo_toplevel().clipboard_get()
         except Exception:
             try:
-                import subprocess as _sp
-                txt = _sp.run('xclip -selection clipboard -o',
-                              shell=True, capture_output=True, text=True,
-                              timeout=2).stdout
+                from utils import get_from_clipboard
+                txt = get_from_clipboard()
             except Exception:
                 txt = ''
         if txt:
@@ -866,18 +867,18 @@ class NetworkScreen(ctk.CTkFrame):
         query = self._find_entry.get().strip()
         if not query:
             return
-        self._tlog.tag_remove('found','1.0','end')
-        self._tlog.tag_configure('found',
+        self._tlog._textbox.tag_remove('found','1.0','end')
+        self._tlog._textbox.tag_configure('found',
                                   background=C['am'], foreground=C['bg'])
         # Highlight all
         total = 0
         idx = '1.0'
         while True:
-            idx = self._tlog.search(query, idx, nocase=True, stopindex='end')
+            idx = self._tlog._textbox.search(query, idx, nocase=True, stopindex='end')
             if not idx:
                 break
             end_ = f'{idx}+{len(query)}c'
-            self._tlog.tag_add('found', idx, end_)
+            self._tlog._textbox.tag_add('found', idx, end_)
             total += 1
             idx = end_
         if total == 0:
@@ -885,11 +886,11 @@ class NetworkScreen(ctk.CTkFrame):
             return
         # Navigate
         search_from = getattr(self, '_find_from', '1.0')
-        nxt = self._tlog.search(query, search_from, nocase=True,
+        nxt = self._tlog._textbox.search(query, search_from, nocase=True,
                                  stopindex='1.0' if reverse else 'end',
                                  backwards=reverse)
         if not nxt:
-            nxt = self._tlog.search(query,
+            nxt = self._tlog._textbox.search(query,
                                      'end' if reverse else '1.0',
                                      nocase=True,
                                      stopindex='1.0' if reverse else 'end',

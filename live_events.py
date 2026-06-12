@@ -4,9 +4,15 @@ Real-time system event monitor with visual Map Radar and Security Alerts.
 High-Performance restructuring with decoupled UI processing.
 """
 import customtkinter as ctk
-import threading, subprocess, time, os, select, math, random, re, queue, signal
+import threading, subprocess, time, os, math, random, re, queue, signal
 from widgets import C, MONO_SM, Btn
 from logger import get_logger
+from utils import IS_WINDOWS, IS_LINUX
+
+try:
+    import select
+except ImportError:
+    select = None
 
 log = get_logger('live_events')
 
@@ -204,7 +210,10 @@ class LiveEventsScreen(ctk.CTkFrame):
     def _stop_proc(self):
         if self._proc:
             try:
-                os.killpg(os.getpgid(self._proc.pid), signal.SIGTERM)
+                if not IS_WINDOWS and hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(self._proc.pid), signal.SIGTERM)
+                else:
+                    self._proc.terminate()
             except:
                 try: self._proc.terminate()
                 except: pass
@@ -214,38 +223,64 @@ class LiveEventsScreen(ctk.CTkFrame):
         if not self._monitoring: return
         log.info("Starting monitor loop...")
         
-        # 1. Try system-level real-time logs
-        system_candidates = [
-            "journalctl -f -n 20 2>/dev/null",
-            "tail -f /var/log/syslog 2>/dev/null",
-            "tail -f /var/log/auth.log 2>/dev/null",
-        ]
-        
+        # 1. Try system-level real-time logs (Linux only)
         found_cmd = None
-        for cmd in system_candidates:
-            if not self._monitoring: return
-            try:
-                self._proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, 
-                                            stderr=subprocess.STDOUT, text=True, 
-                                            preexec_fn=os.setsid, bufsize=1)
-                r, _, _ = select.select([self._proc.stdout], [], [], 0.5)
-                if r or self._proc.poll() is None:
-                    found_cmd = cmd
-                    self._queue.put((f"✓ SYSTEM LOG ACTIVE: {cmd.split()[0].upper()}\n\n", 'net'))
-                    break
-                else: self._stop_proc()
-            except: self._stop_proc()
+        if IS_LINUX:
+            system_candidates = [
+                ["journalctl", "-f", "-n", "20"],
+                ["tail", "-f", "/var/log/syslog"],
+                ["tail", "-f", "/var/log/auth.log"],
+            ]
+            
+            for cmd in system_candidates:
+                if not self._monitoring: return
+                try:
+                    # Preexec_fn is used to set process group so we can kill children easily
+                    self._proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE, 
+                                                stderr=subprocess.STDOUT, text=True, 
+                                                preexec_fn=os.setsid if hasattr(os, 'setsid') else None, 
+                                                bufsize=1)
+                    if select:
+                        r, _, _ = select.select([self._proc.stdout], [], [], 0.5)
+                        if r or self._proc.poll() is None:
+                            found_cmd = cmd
+                            self._queue.put((f"✓ SYSTEM LOG ACTIVE: {cmd[0].upper()}\n\n", 'net'))
+                            break
+                    else:
+                        time.sleep(0.5)
+                        if self._proc.poll() is None:
+                            found_cmd = cmd
+                            self._queue.put((f"✓ SYSTEM LOG ACTIVE: {cmd[0].upper()}\n\n", 'net'))
+                            break
+                    self._stop_proc()
+                except: self._stop_proc()
 
         # 2. Fallback to application's own log file (guaranteed readable)
         if not found_cmd:
             from logger import LOG_FILE
             if os.path.exists(LOG_FILE):
                 log.info(f"Falling back to app log: {LOG_FILE}")
-                found_cmd = f"tail -f {LOG_FILE}"
-                self._proc = subprocess.Popen(found_cmd, shell=True, stdout=subprocess.PIPE,
-                                            stderr=subprocess.STDOUT, text=True,
-                                            preexec_fn=os.setsid, bufsize=1)
-                self._queue.put(("✓ APPLICATION LOG ACTIVE: Security & App events streaming.\n\n", 'ok'))
+                if IS_WINDOWS:
+                    self._queue.put(("✓ APPLICATION LOG ACTIVE: Security & App events streaming.\n\n", 'ok'))
+                    try:
+                        with open(LOG_FILE, 'r', encoding='utf-8', errors='replace') as f:
+                            f.seek(0, 2) # Go to end
+                            while self._monitoring:
+                                line = f.readline()
+                                if line:
+                                    self._queue.put((line, None))
+                                else:
+                                    time.sleep(0.5)
+                    except Exception as e:
+                        log.error(f"App log read error: {e}")
+                    return
+                else:
+                    found_cmd = ["tail", "-f", LOG_FILE]
+                    self._proc = subprocess.Popen(found_cmd, shell=False, stdout=subprocess.PIPE,
+                                                stderr=subprocess.STDOUT, text=True,
+                                                preexec_fn=os.setsid if hasattr(os, 'setsid') else None, 
+                                                bufsize=1)
+                    self._queue.put(("✓ APPLICATION LOG ACTIVE: Security & App events streaming.\n\n", 'ok'))
 
         # 3. Final fallback to mock if everything else fails
         if not found_cmd:
@@ -266,15 +301,24 @@ class LiveEventsScreen(ctk.CTkFrame):
 
         try:
             while self._monitoring and self._proc and self._proc.stdout:
-                r, _, _ = select.select([self._proc.stdout], [], [], 0.5)
-                if r:
-                    line = self._proc.stdout.readline()
-                    if not line:
+                if select:
+                    r, _, _ = select.select([self._proc.stdout], [], [], 0.5)
+                    if r:
+                        line = self._proc.stdout.readline()
+                        if not line:
+                            if self._proc.poll() is not None: break
+                            continue
+                        self._queue.put((line, None))
+                    else:
                         if self._proc.poll() is not None: break
-                        continue
-                    self._queue.put((line, None))
                 else:
-                    if self._proc.poll() is not None: break
+                    line = self._proc.stdout.readline()
+                    if line:
+                        self._queue.put((line, None))
+                    elif self._proc.poll() is not None:
+                        break
+                    else:
+                        time.sleep(0.1)
         except Exception as e:
             log.error(f"Monitor loop error: {e}")
         finally: 
@@ -312,17 +356,25 @@ class LiveEventsScreen(ctk.CTkFrame):
         except: pass
 
     def _traffic_loop(self):
+        import psutil
         while self._monitoring:
             try:
-                # Real traffic density from netstat/ss
-                out, _, _ = subprocess.Popen("ss -t | wc -l", shell=True, stdout=subprocess.PIPE, text=True).communicate()
-                val = (int(out.strip()) / 100) if out.strip().isdigit() else 0.1
+                # Real traffic density from net_connections
+                conns = psutil.net_connections(kind='inet')
+                count = len(conns)
+                val = (count / 100)
                 self.after(0, lambda v=val: self.density_bar.set(min(1.0, v)))
                 
                 # Sample connections for the traffic box
-                c_out, _, _ = subprocess.Popen("ss -tan | head -15", shell=True, stdout=subprocess.PIPE, text=True).communicate()
+                c_out = ""
+                for c in conns[:15]:
+                    laddr = f"{c.laddr.ip}:{c.laddr.port}"
+                    raddr = f"{c.raddr.ip}:{c.raddr.port}" if c.raddr else "-"
+                    c_out += f"{c.status:<12} {laddr:<25} {raddr}\n"
+                
                 self.after(0, self._update_traffic, c_out)
-            except: pass
+            except Exception as e:
+                log.error(f"Traffic loop error: {e}")
             time.sleep(3)
 
     def _update_traffic(self, text):

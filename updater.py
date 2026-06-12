@@ -10,13 +10,13 @@ import customtkinter as ctk
 from widgets import C, MONO, MONO_SM, Card, SectionHeader, Btn, ResultBox, ScrollableFrame
 from widgets import InfoGrid
 from logger import get_logger
+from version import VERSION as CURRENT_VER
 
 log = get_logger('updater')
 
 REPO_OWNER  = 'mintpro004'
 REPO_NAME   = 'mint-scan-linux-V11'
 REPO_API    = f'https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}'
-CURRENT_VER = '8.3.0'
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -44,20 +44,22 @@ def _get_default_branch(timeout=8):
     """Detect the repo's default branch (main / master / etc.)."""
     # Check local git first (fast, no network)
     try:
-        r = subprocess.run('git remote show origin 2>/dev/null | grep "HEAD branch"',
-                           shell=True, capture_output=True, text=True,
+        # Avoid shell=True and grep pipe
+        r = subprocess.run(['git', 'remote', 'show', 'origin'],
+                           shell=False, capture_output=True, text=True,
                            cwd=BASE_DIR, timeout=10)
-        for line in r.stdout.splitlines():
-            if 'HEAD branch' in line:
-                branch = line.split(':', 1)[1].strip()
-                if branch and branch != '(unknown)':
-                    return branch
+        if r.returncode == 0:
+            for line in r.stdout.splitlines():
+                if 'HEAD branch' in line:
+                    branch = line.split(':', 1)[1].strip()
+                    if branch and branch != '(unknown)':
+                        return branch
     except Exception:
         pass
     # Ask GitHub API
     try:
         req = urllib.request.Request(
-            REPO_API, headers={'User-Agent': 'MintScan-Updater/8.3.0'})
+            REPO_API, headers={'User-Agent': f'MintScan-Updater/{CURRENT_VER}'})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             data = json.loads(r.read().decode())
         return data.get('default_branch', 'main')
@@ -65,14 +67,15 @@ def _get_default_branch(timeout=8):
         pass
     # Last resort: check local branches
     try:
-        r = subprocess.run('git branch -r 2>/dev/null', shell=True,
+        r = subprocess.run(['git', 'branch', '-r'], shell=False,
                            capture_output=True, text=True, cwd=BASE_DIR, timeout=5)
-        for line in r.stdout.splitlines():
-            line = line.strip()
-            if 'origin/main' in line:
-                return 'main'
-            if 'origin/master' in line:
-                return 'master'
+        if r.returncode == 0:
+            for line in r.stdout.splitlines():
+                line = line.strip()
+                if 'origin/main' in line:
+                    return 'main'
+                if 'origin/master' in line:
+                    return 'master'
     except Exception:
         pass
     return 'main'
@@ -89,7 +92,7 @@ def check_for_update(timeout=10):
     try:
         req = urllib.request.Request(
             f'{REPO_API}/releases/latest',
-            headers={'User-Agent': 'MintScan-Updater/8.3.0'})
+            headers={'User-Agent': f'MintScan-Updater/{CURRENT_VER}'})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             data = json.loads(r.read().decode())
         if 'tag_name' in data:
@@ -118,7 +121,8 @@ def check_for_update(timeout=10):
     try:
         req = urllib.request.Request(
             f'{REPO_API}/tags',
-            headers={'User-Agent': 'MintScan-Updater/8.3.0'})
+            headers={'User-Agent': f'MintScan-Updater/{CURRENT_VER}'})
+
         with urllib.request.urlopen(req, timeout=timeout) as r:
             tags = json.loads(r.read().decode())
         if tags:
@@ -138,12 +142,12 @@ def check_for_update(timeout=10):
     if os.path.isdir(git_dir):
         try:
             branch = _get_default_branch()
-            subprocess.run(f'git fetch origin {branch} 2>/dev/null',
-                           shell=True, cwd=BASE_DIR, timeout=20,
+            subprocess.run(['git', 'fetch', 'origin', branch],
+                           shell=False, cwd=BASE_DIR, timeout=20,
                            capture_output=True)
             r = subprocess.run(
-                f'git rev-list HEAD..origin/{branch} --count 2>/dev/null',
-                shell=True, capture_output=True, text=True,
+                ['git', 'rev-list', 'HEAD..origin/' + branch, '--count'],
+                shell=False, capture_output=True, text=True,
                 cwd=BASE_DIR, timeout=10)
             behind = int(r.stdout.strip() or '0')
             if behind > 0:
@@ -180,17 +184,17 @@ def _ensure_remote(log_fn=None):
 
     expected = f'https://github.com/{REPO_OWNER}/{REPO_NAME}.git'
     try:
-        r = subprocess.run('git remote get-url origin', shell=True,
+        r = subprocess.run(['git', 'remote', 'get-url', 'origin'], shell=False,
                            capture_output=True, text=True, cwd=BASE_DIR, timeout=5)
         current = r.stdout.strip()
         if not current:
             _l('Remote origin missing. Adding...')
-            subprocess.run(f'git remote add origin "{expected}"',
-                           shell=True, cwd=BASE_DIR, timeout=5)
+            subprocess.run(['git', 'remote', 'add', 'origin', expected],
+                           shell=False, cwd=BASE_DIR, timeout=5)
         elif current != expected and current != expected.replace('.git',''):
             _l(f'Remote origin incorrect ({current}). Fixing...')
-            subprocess.run(f'git remote set-url origin "{expected}"',
-                           shell=True, cwd=BASE_DIR, timeout=5)
+            subprocess.run(['git', 'remote', 'set-url', 'origin', expected],
+                           shell=False, cwd=BASE_DIR, timeout=5)
     except Exception as e:
         _l(f'Remote check failed: {e}')
     return True
@@ -214,8 +218,8 @@ def do_git_update(log_fn=None):
 
     # Fix ownership (Crostini common issue)
     _l('Checking ownership...')
-    subprocess.run(f'sudo chown -R "$USER:$USER" "{BASE_DIR}" 2>/dev/null || true',
-                   shell=True, timeout=15, capture_output=True)
+    from utils import run_cmd as _rc
+    _rc(['sudo', 'chown', '-R', os.environ.get('USER', 'mint'), BASE_DIR], timeout=15)
 
     # Ensure remote is OK
     _ensure_remote(log_fn)
@@ -226,8 +230,8 @@ def do_git_update(log_fn=None):
 
     # Fetch
     _l(f'Fetching from origin...')
-    r = subprocess.run(f'git fetch origin {branch}',
-                       shell=True, capture_output=True, text=True,
+    r = subprocess.run(['git', 'fetch', 'origin', branch],
+                       shell=False, capture_output=True, text=True,
                        cwd=BASE_DIR, timeout=60)
     if r.returncode != 0:
         _l(f'Fetch failed: {r.stderr.strip()}')
@@ -236,18 +240,18 @@ def do_git_update(log_fn=None):
     _l(r.stdout.strip() or '(fetch ok)')
 
     # Show what's coming
-    r2 = subprocess.run(f'git log HEAD..origin/{branch} --oneline 2>/dev/null | head -8',
-                        shell=True, capture_output=True, text=True,
+    r2 = subprocess.run(['git', 'log', 'HEAD..origin/' + branch, '--oneline'],
+                        shell=False, capture_output=True, text=True,
                         cwd=BASE_DIR, timeout=10)
     if r2.stdout.strip():
         _l('Incoming changes:')
-        for line in r2.stdout.strip().splitlines():
+        for line in r2.stdout.strip().splitlines()[:8]:
             _l(f'  {line}')
 
     # Pull with rebase
     _l(f'Pulling origin/{branch} --rebase...')
-    r = subprocess.run(f'git pull origin {branch} --rebase',
-                       shell=True, capture_output=True, text=True,
+    r = subprocess.run(['git', 'pull', 'origin', branch, '--rebase'],
+                       shell=False, capture_output=True, text=True,
                        cwd=BASE_DIR, timeout=120)
     for line in (r.stdout + r.stderr).splitlines():
         if line.strip():
@@ -255,8 +259,8 @@ def do_git_update(log_fn=None):
 
     if r.returncode != 0:
         _l('Pull/rebase failed. Trying merge instead...')
-        r = subprocess.run(f'git pull origin {branch} --no-rebase',
-                           shell=True, capture_output=True, text=True,
+        r = subprocess.run(['git', 'pull', 'origin', branch, '--no-rebase'],
+                           shell=False, capture_output=True, text=True,
                            cwd=BASE_DIR, timeout=60)
         for line in (r.stdout + r.stderr).splitlines():
             if line.strip():
@@ -271,11 +275,15 @@ def do_git_update(log_fn=None):
     req_file = os.path.join(BASE_DIR, 'requirements.txt')
     if os.path.exists(venv_pip) and os.path.exists(req_file):
         r = subprocess.run(
-            f'"{venv_pip}" install -r "{req_file}" -q '
-            '--break-system-packages 2>/dev/null || '
-            f'"{venv_pip}" install -r "{req_file}" -q',
-            shell=True, capture_output=True, text=True,
+            [venv_pip, 'install', '-r', req_file, '-q', '--break-system-packages'],
+            shell=False, capture_output=True, text=True,
             cwd=BASE_DIR, timeout=120)
+        if r.returncode != 0:
+             r = subprocess.run(
+                [venv_pip, 'install', '-r', req_file, '-q'],
+                shell=False, capture_output=True, text=True,
+                cwd=BASE_DIR, timeout=120)
+        
         if r.returncode == 0:
             _l('Python packages updated.')
         else:
@@ -317,7 +325,7 @@ def do_zip_update(zip_url, log_fn=None):
         _l(f'Downloading: {zip_url}')
         req = urllib.request.Request(
             zip_url,
-            headers={'User-Agent': 'MintScan-Updater/8.3.0'})
+            headers={'User-Agent': f'MintScan-Updater/{CURRENT_VER}'})
 
         with urllib.request.urlopen(req, timeout=60) as resp:
             total = int(resp.headers.get('Content-Length', 0))
@@ -366,7 +374,7 @@ def do_zip_update(zip_url, log_fn=None):
         install_sh = os.path.join(BASE_DIR, 'install.sh')
         if os.path.exists(install_sh):
             _l('Running install.sh to update dependencies...')
-            r = subprocess.run('bash install.sh', shell=True,
+            r = subprocess.run(['bash', install_sh], shell=False,
                                capture_output=True, text=True,
                                cwd=BASE_DIR, timeout=300)
             for line in r.stdout.splitlines()[-10:]:
@@ -444,8 +452,8 @@ class UpdaterScreen(ctk.CTkFrame):
         # Git status
         git_dir = os.path.join(BASE_DIR, '.git')
         if os.path.isdir(git_dir):
-            r = subprocess.run('git log --oneline -1 2>/dev/null',
-                               shell=True, capture_output=True, text=True,
+            r = subprocess.run(['git', 'log', '--oneline', '-1'],
+                               shell=False, capture_output=True, text=True,
                                cwd=BASE_DIR, timeout=5)
             commit = r.stdout.strip() or 'unknown'
             ctk.CTkLabel(vc, text=f'Git commit: {commit[:72]}',
