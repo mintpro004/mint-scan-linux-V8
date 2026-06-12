@@ -143,10 +143,11 @@ def get_public_ip_info():
     if _ip_cache['data'] and (now - _ip_cache['ts']) < 300:
         return _ip_cache['data']
     try:
+        from version import VERSION
         import urllib.request
         req = urllib.request.Request(
             'https://ipapi.co/json/',
-            headers={'User-Agent': 'MintScan/8.3.0'})
+            headers={'User-Agent': f'MintScan/{VERSION}'})
         with urllib.request.urlopen(req, timeout=6) as r:
             data = json.loads(r.read().decode())
         _ip_cache['data'] = data

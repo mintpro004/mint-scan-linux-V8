@@ -38,7 +38,7 @@ bash run.sh
 </ul>
 
 <h2 style="color: #0056b3;">3. Security Hardening</h2>
-<p>Version 8.3.0 includes <strong>advanced security hardening</strong>:</p>
+<p>Version 11.1.0 includes <strong>advanced security hardening</strong>:</p>
 <ul>
     <li><strong>Shell Injection Protection:</strong> All system commands now use list-based execution to prevent exploitation.</li>
     <li><strong>Input Validation:</strong> All user inputs are sanitized via strict regex filters.</li>
